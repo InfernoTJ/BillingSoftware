@@ -1,0 +1,1693 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  ShoppingCart, 
+  Plus, 
+  Trash2, 
+  Save, 
+  Lock,
+  Calendar,
+  Package,
+  RefreshCw,
+  Eye,
+  History,
+  Edit3
+} from 'lucide-react';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
+import ReactDOM from 'react-dom';
+
+const PinModal = ({ isOpen, onClose, onVerify }) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+    
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const isValid = await window.electronAPI.verifyPin(pin);
+    if (isValid) {
+      onVerify();
+      onClose();
+      setPin('');
+      setError('');
+    } else {
+      setError('Invalid PIN');
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex items-center mb-4">
+          <Lock className="w-6 h-6 text-red-600 mr-2" />
+          <h2 className="text-xl font-bold text-gray-900">Enter PIN</h2>
+        </div>
+        <p className="text-gray-600 mb-4">This module is protected. Please enter your PIN to continue.</p>
+        
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            autoFocus
+            placeholder="Enter 4-digit PIN"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
+            maxLength="4"
+          />
+          
+          {error && (
+            <p className="text-red-600 text-sm mb-4">{error}</p>
+          )}
+          
+          <div className="flex space-x-3">
+            <button
+              type="submit"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Verify
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+        
+        {/* <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+          <p className="text-sm text-gray-600">Default PIN: 1234</p>
+        </div> */}
+      </div>
+    </div>
+  );
+};
+
+const DropdownPortal = ({ children, anchorRef, show }) => {
+  const [style, setStyle] = useState({});
+  useEffect(() => {
+    if (show && anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setStyle({
+        position: 'fixed',
+        left: rect.left,
+        top: rect.bottom,
+        width: rect.width,
+        zIndex: 9999,
+      });
+    }
+  }, [show, anchorRef]);
+  if (!show) return null;
+  return ReactDOM.createPortal(
+    <div style={style}>{children}</div>,
+    document.body
+  );
+};
+
+const Purchase = () => {
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const [items, setItems] = useState([]);
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showNewSupplierForm, setShowNewSupplierForm] = useState(false);
+  
+  const [purchaseForm, setPurchaseForm] = useState({
+    supplier_id: '',
+    invoice_number: '',
+    purchase_date: new Date().toISOString().split('T')[0],
+    discount: 0,
+    items: []
+  });
+
+
+  // Add these payment handler functions after your state declarations
+const handlePurchasePaidChange = async (purchaseId, isPaid) => {
+  if (isPaid) {
+    // Show payment modal for selecting payment method
+    const purchase = purchaseHistory.find(p => p.id === purchaseId);
+    setPendingPurchasePayment(purchase);
+    setPurchasePaymentForm({
+      ...purchasePaymentForm,
+      amount: purchase.total_amount,
+      paymentDetails: {}
+    });
+    setShowPurchasePaymentModal(true);
+  } else {
+    // Show payment history instead of unpaid
+    try {
+      const history = await window.electronAPI.getPurchasePaymentDetails(purchaseId);
+      setPurchasePaymentHistory(history);
+      setShowPurchasePaymentHistoryModal(true);
+    } catch (error) {
+      toast.error('Error loading payment history');
+    }
+  }
+}; 
+
+const handlePurchasePaymentSubmit = async () => {
+  try {
+    const result = await window.electronAPI.savePurchasePayment({
+      purchaseId: pendingPurchasePayment.id,
+      paymentMethod: purchasePaymentForm.paymentMethod,
+      amount: purchasePaymentForm.amount,
+      paymentDate: purchasePaymentForm.paymentDate,
+      paymentDetails: purchasePaymentForm.paymentDetails
+    });
+
+    if (result.success) {
+      setPurchaseHistory(prevHistory => 
+        prevHistory.map(purchase => 
+          purchase.id === pendingPurchasePayment.id 
+            ? { ...purchase, is_paid: 1, payment_method: purchasePaymentForm.paymentMethod } 
+            : purchase
+        )
+      );
+      setShowPurchasePaymentModal(false);
+      setPendingPurchasePayment(null);
+      setPurchasePaymentForm({
+        paymentMethod: 'cash',
+        amount: 0,
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDetails: {}
+      });
+      toast.success('Payment recorded successfully');
+    }
+  } catch (error) { 
+    console.log(error);
+    toast.error('Error recording payment');
+  }
+};
+
+  const [newSupplier, setNewSupplier] = useState({
+    name: '',
+    contact: '',
+    address: ''
+  });
+
+  const [showItemHistory, setShowItemHistory] = useState(null);
+  const [itemHistory, setItemHistory] = useState([]);
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [showSupplierList, setShowSupplierList] = useState(false);
+  const [supplierDropdownIndex, setSupplierDropdownIndex] = useState(0);
+  const supplierInputRef = React.useRef();
+  const navigate = useNavigate();
+
+  // For item dropdown search
+  const [itemSearch, setItemSearch] = useState({});
+  const [showItemList, setShowItemList] = useState({});
+  const [itemDropdownIndex, setItemDropdownIndex] = useState({});
+
+  // For item input refs
+  const itemInputRefs = React.useRef({});
+
+  // New state for history filters
+  const [historyFilters, setHistoryFilters] = useState({
+    supplier: '',
+    invoice: '',
+    date: ''
+  });
+
+  // State for delete confirmation
+  const [deleteId, setDeleteId] = useState(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  // Add these state variables after your existing state
+  const [showPurchasePaymentModal, setShowPurchasePaymentModal] = useState(false);
+  const [showPurchasePaymentHistoryModal, setShowPurchasePaymentHistoryModal] = useState(false);
+  const [pendingPurchasePayment, setPendingPurchasePayment] = useState(null);
+  const [purchasePaymentHistory, setPurchasePaymentHistory] = useState(null);
+  const [purchasePaymentForm, setPurchasePaymentForm] = useState({
+    paymentMethod: 'cash',
+    amount: 0,
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDetails: {}
+  });
+
+  useEffect(() => {
+    if (isUnlocked) {
+      loadData();
+    }
+  }, [isUnlocked]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [suppliersData, itemsData, historyData] = await Promise.all([
+        window.electronAPI.getSuppliers(),
+        window.electronAPI.getInventory(),
+        window.electronAPI.getPurchaseHistory()
+      ]);
+      
+      setSuppliers(suppliersData);
+      setItems(itemsData);
+      setPurchaseHistory(historyData); 
+      console.log(historyData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnlock = () => {
+    setShowPinModal(true);
+  };
+
+  const handlePinVerified = () => {
+    setIsUnlocked(true);
+  };
+
+  const addItemToPurchase = () => { 
+    setPurchaseForm({
+      ...purchaseForm,
+      items: [...purchaseForm.items, { id: '', quantity: '', unit_price: '', total_price: 0, discount: 0 }]
+    });
+  };
+
+  const updatePurchaseItem = (index, field, value) => {
+    const updatedItems = [...purchaseForm.items];
+    updatedItems[index][field] = value;
+    
+    if (field === 'quantity' || field === 'unit_price') {
+      updatedItems[index].total_price = updatedItems[index].quantity * updatedItems[index].unit_price;
+    }
+    
+    setPurchaseForm({ ...purchaseForm, items: updatedItems });
+  };
+
+  const removePurchaseItem = (index) => {
+    const updatedItems = purchaseForm.items.filter((_, i) => i !== index);
+
+    // Remove related search/dropdown state for this row
+    const newItemSearch = { ...itemSearch };
+    const newShowItemList = { ...showItemList };
+    const newItemDropdownIndex = { ...itemDropdownIndex };
+    delete newItemSearch[index];
+    delete newShowItemList[index];
+    delete newItemDropdownIndex[index];
+
+    // Shift keys for rows after the deleted one
+    const shiftKeys = (obj) => {
+      const shifted = {};
+      Object.keys(obj).forEach(key => {
+        const k = parseInt(key, 10);
+        if (k < index) shifted[k] = obj[k];
+        else if (k > index) shifted[k - 1] = obj[k];
+      });
+      return shifted;
+    };
+
+    setPurchaseForm({ ...purchaseForm, items: updatedItems });
+    setItemSearch(shiftKeys(newItemSearch));
+    setShowItemList(shiftKeys(newShowItemList));
+    setItemDropdownIndex(shiftKeys(newItemDropdownIndex));
+  };
+
+  const addNewSupplier = async () => {
+    try {
+      const supplier = await window.electronAPI.addSupplier(newSupplier);
+      setSuppliers([...suppliers, supplier]);
+      setNewSupplier({ name: '', contact: '', address: '' });
+      setShowNewSupplierForm(false);
+    } catch (error) { 
+      console.error('Error adding supplier:', error);
+    }
+  };
+
+  const savePurchase = async () => {
+
+
+    if (!purchaseForm.supplier_id || !purchaseForm.invoice_number || purchaseForm.items.length === 0) {
+      toast.error('Please fill all required fields');
+      return;
+    }
+
+    
+    // Filter out invalid items
+    const validItems = purchaseForm.items.filter(item => {
+      const selectedItem = items.find(i => i.id == item.id);
+      return (
+        selectedItem &&
+        selectedItem.name &&
+        item.quantity && item.quantity > 0 &&
+        item.unit_price && item.unit_price > 0
+      );
+    });
+
+    if (validItems.length === 0) {
+      toast.error('Please enter at least one valid item (with name, quantity, and unit price)');
+      return;
+    }
+
+
+    const total_amount = getFinalTotal();
+    const rounding_off = getRoundingOff();
+
+      const cgst_total = purchaseForm.items.reduce((sum, item) => {
+    const selectedItem = items.find(i => i.id == item.id);
+    const gstRate = selectedItem?.gst_percentage || 0;
+    const baseAmount = item.quantity * item.unit_price;
+    return sum + (baseAmount * gstRate) / 200;
+  }, 0); 
+
+  const sgst_total = purchaseForm.items.reduce((sum, item) => {
+    const selectedItem = items.find(i => i.id == item.id);
+    const gstRate = selectedItem?.gst_percentage || 0;
+    const baseAmount = item.quantity * item.unit_price;
+    return sum + (baseAmount * gstRate) / 200;
+  }, 0);
+
+    // Calculate GST for each valid item
+    const itemsWithGST = validItems.map(item => {
+      const selectedItem = items.find(i => i.id == item.id);
+      const baseAmount = item.quantity * item.unit_price;
+      const gstRate = selectedItem?.gst_percentage || 0;
+      const cgstAmount = (baseAmount * gstRate) / 200;
+      const sgstAmount = (baseAmount * gstRate) / 200;
+      const totalPrice = baseAmount + cgstAmount + sgstAmount;
+      return {
+        ...item,
+        gst_percentage: gstRate,
+        cgst_amount: cgstAmount,
+        sgst_amount: sgstAmount,
+        total_price: totalPrice
+      };
+    });
+
+ 
+
+    try {
+      await window.electronAPI.savePurchase({
+      ...purchaseForm,
+      items: itemsWithGST, // each item includes .discount
+      total_amount,
+      cgst_total,
+      sgst_total, 
+      rounding_off,
+      discount: purchaseForm.discount
+    });
+ 
+      // Reset form: clear all except date
+      setPurchaseForm({
+        supplier_id: '',
+        invoice_number: '',
+        purchase_date: purchaseForm.purchase_date, // keep the same date
+        items: []
+      });
+      setSupplierSearch('');
+      setItemSearch({});
+      setShowSupplierList(false);
+      setShowItemList({});
+      loadData();
+      toast.success('Purchase saved successfully!');
+    } catch (error) { 
+      console.error('Error saving purchase:', error);
+      toast.error('Error saving purchase');
+    } 
+  };
+ 
+  const showPurchaseHistory = async (itemId) => {
+    try {
+      if (window.electronAPI) {
+        const history = await window.electronAPI.getItemPurchaseHistory(itemId);
+        setItemHistory(history);
+        setShowItemHistory(itemId);
+        console.log(history); 
+      }
+    } catch (error) {
+      toast.error('Error loading item history');
+    }
+  };
+
+  // Filter suppliers based on input
+  const filteredSuppliers = suppliers.filter(s =>
+    s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+  );
+
+  // Keyboard navigation for supplier dropdown
+  const handleSupplierInputKeyDown = (e) => {
+    if (showSupplierList && filteredSuppliers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSupplierDropdownIndex((prev) =>
+          prev < filteredSuppliers.length - 1 ? prev + 1 : 0
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSupplierDropdownIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredSuppliers.length - 1
+        );
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (filteredSuppliers[supplierDropdownIndex]) {
+          handleSupplierSelect(filteredSuppliers[supplierDropdownIndex]);
+          e.preventDefault();
+          // Move focus to next field (invoice number)
+          document.getElementById('invoice-input')?.focus();
+        }
+      } else if (e.key === 'Escape') {
+        setShowSupplierList(false);
+      }
+    }
+  };
+
+  const handleSupplierSelect = (supplier) => {
+    setPurchaseForm({ ...purchaseForm, supplier_id: supplier.id });
+    setSupplierSearch(supplier.name);
+    setShowSupplierList(false);
+    setSupplierDropdownIndex(0);
+  };
+
+  // Filter items for a row
+  const getFilteredItems = (search) =>
+    items.filter(i =>
+      i.name.toLowerCase().includes((search || '').toLowerCase())
+    );
+
+  // Keyboard navigation for item dropdown
+  const handleItemInputKeyDown = (e, rowIdx) => {
+    const filtered = getFilteredItems(itemSearch[rowIdx]);
+    if (showItemList[rowIdx] && filtered.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setItemDropdownIndex(idx => ({
+          ...idx,
+          [rowIdx]: idx[rowIdx] < filtered.length - 1 ? idx[rowIdx] + 1 : 0
+        }));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setItemDropdownIndex(idx => ({
+          ...idx,
+          [rowIdx]: idx[rowIdx] > 0 ? idx[rowIdx] - 1 : filtered.length - 1
+        }));
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (filtered[itemDropdownIndex[rowIdx] || 0]) {
+          handleItemSelect(filtered[itemDropdownIndex[rowIdx] || 0], rowIdx);
+          e.preventDefault();
+          // Move focus to quantity input
+          document.getElementById(`qty-input-${rowIdx}`)?.focus();
+        }
+      } else if (e.key === 'Escape') {
+        setShowItemList(list => ({ ...list, [rowIdx]: false }));
+      }
+    }
+    // Delete row on Delete key
+    if (e.key === 'Delete') {
+      removePurchaseItem(rowIdx);
+    }
+    // Show history on Ctrl+H
+    if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+      const itemId = purchaseForm.items[rowIdx]?.id;
+      if (itemId) showPurchaseHistory(itemId);
+    }
+    // Save purchase on Ctrl+C
+    if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+      savePurchase();
+    }
+  };
+
+  const handleItemSelect = (item, rowIdx) => {
+    const updatedItems = [...purchaseForm.items];
+    updatedItems[rowIdx].id = item.id;
+    // Auto-fill unit_price with item's purchase_rate
+    updatedItems[rowIdx].unit_price = item.purchase_rate || 0;
+    setPurchaseForm({ ...purchaseForm, items: updatedItems });
+    setItemSearch(search => ({ ...search, [rowIdx]: item.name }));
+    setShowItemList(list => ({ ...list, [rowIdx]: false }));
+    setItemDropdownIndex(idx => ({ ...idx, [rowIdx]: 0 }));
+  };
+
+  // Save purchase on Ctrl+C anywhere in the form
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault();
+        savePurchase();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    // eslint-disable-next-line
+  }, [purchaseForm, items]);
+
+  // Filtered and sorted purchase history
+  const filteredHistory = purchaseHistory
+    .filter(purchase => {
+      const supplierMatch = historyFilters.supplier
+        ? purchase.supplier_name?.toLowerCase().includes(historyFilters.supplier.toLowerCase())
+        : true;
+      const invoiceMatch = historyFilters.invoice
+        ? purchase.invoice_number?.toLowerCase().includes(historyFilters.invoice.toLowerCase())
+        : true;
+      const dateMatch = historyFilters.date
+        ? new Date(purchase.purchase_date).toLocaleDateString() === new Date(historyFilters.date).toLocaleDateString()
+        : true;
+      return supplierMatch && invoiceMatch && dateMatch;
+    })
+    .sort((a, b) => b.id - a.id); // Latest purchase.id first
+
+  // Delete purchase handler
+  const handleDeletePurchase = async (purchaseId) => {
+    try {
+      // 1. Ask Electron for a stock check before deletion
+      const check = await window.electronAPI.checkPurchaseDeleteStock(purchaseId);
+      if (!check.ok) {
+        toast.error(check.message || 'Cannot delete purchase: Inventory will go negative for one or more items.');
+        return;
+      }
+      // 2. Proceed with deletion if stock is safe
+      await window.electronAPI.deletePurchase(purchaseId);
+      toast.success('Purchase deleted!');
+      loadData(); 
+    } catch (error) {
+    console.log(error);
+      toast.error('Error deleting purchase');
+    } 
+  };
+
+  // Calculate subtotal (after per-item discount)
+  const subtotal = purchaseForm.items.reduce((sum, item) => {
+    const selectedItem = items.find(i => i.id == item.id);
+    const baseAmount = item.quantity * item.unit_price;
+    const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+    return sum + (baseAmount - itemDiscount);
+  }, 0);
+
+  // Overall discount
+  const overallDiscountAmount = purchaseForm.discount ? (subtotal * purchaseForm.discount) / 100 : 0;
+  const subtotalAfterOverallDiscount = subtotal - overallDiscountAmount;
+
+  // GST on discounted subtotal
+  const gstTotal = purchaseForm.items.reduce((sum, item) => {
+    const selectedItem = items.find(i => i.id == item.id);
+    const gstRate = selectedItem?.gst_percentage || 0;
+    const baseAmount = item.quantity * item.unit_price;
+    const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+    const discountedAmount = baseAmount - itemDiscount;
+    return sum + (discountedAmount * gstRate) / 100;
+  }, 0);
+ 
+  // Total with GST and overall discount
+  const totalWithGst = subtotalAfterOverallDiscount + gstTotal;
+
+  // Rounding off calculation
+  const getRoundingOff = () => {
+    return +(Math.round(totalWithGst) - totalWithGst).toFixed(2);
+  };
+  const getFinalTotal = () => Math.round(totalWithGst);
+ 
+  if (!isUnlocked) {
+    return (
+      <>
+        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-lg shadow-sm border border-gray-200">
+          <Lock className="w-16 h-16 text-gray-400 mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Purchase Module Locked</h2>
+          <p className="text-gray-600 text-center mb-6">
+            This module is protected and requires PIN verification to access.
+          </p>
+          <button
+            onClick={handleUnlock}
+             autoFocus
+            className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Unlock Module
+          </button> 
+        </div>
+        <PinModal
+          isOpen={showPinModal}
+          onClose={() => setShowPinModal(false)}
+          onVerify={handlePinVerified}
+        />
+      </>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Purchase Management</h1>
+          <p className="text-gray-600">Record new purchases and manage supplier information</p>
+        </div>
+      </div>
+
+      {/* Purchase Form */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">New Purchase</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Supplier Dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
+            <div className="relative">
+              <input
+                ref={supplierInputRef}
+                type="text" 
+        
+                value={supplierSearch}
+                onChange={e => {
+                  setSupplierSearch(e.target.value);
+                  setShowSupplierList(true);
+                  setSupplierDropdownIndex(0);
+                  const match = suppliers.find(s => s.name.toLowerCase() === e.target.value.toLowerCase());
+                  setPurchaseForm({ ...purchaseForm, supplier_id: match ? match.id : '' });
+                }}
+                onFocus={() => setShowSupplierList(true)}
+                onBlur={() => setTimeout(() => setShowSupplierList(false), 100)}
+                onKeyDown={handleSupplierInputKeyDown}
+                placeholder="Type to search supplier"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoComplete="off"
+                tabIndex={0}
+              />
+              {showSupplierList && filteredSuppliers.length > 0 && (
+                <ul className="absolute z-10 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
+                  {filteredSuppliers.map((supplier, idx) => (
+                    <li
+                      key={supplier.id}
+                      className={`px-3 py-2 cursor-pointer ${
+                        idx === supplierDropdownIndex ? 'bg-blue-100' : ''
+                      }`}
+                      onMouseDown={() => handleSupplierSelect(supplier)}
+                      tabIndex={-1}
+                    >
+                      {supplier.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button
+              onClick={() => setShowNewSupplierForm(true)}
+              className="mt-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              tabIndex={0}
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Invoice Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Invoice Number</label>
+            <input
+              id="invoice-input"
+              type="text"
+              value={purchaseForm.invoice_number}
+              onChange={(e) => setPurchaseForm({ ...purchaseForm, invoice_number: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter invoice number"
+              tabIndex={0}
+            />
+          </div>
+          {/* Purchase Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Date</label>
+            <input
+              type="date"
+              value={purchaseForm.purchase_date}
+              onChange={(e) => setPurchaseForm({ ...purchaseForm, purchase_date: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              tabIndex={0}
+            />
+          </div>
+        </div>
+
+        {/* Items Table */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-md font-medium text-gray-900">Items</h3>
+            <button
+              onClick={addItemToPurchase}
+              className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Item
+            </button> 
+          </div>
+          
+          
+          {purchaseForm.items.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th> 
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">MRP</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Discount (%)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Discounted Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total (With GST)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {purchaseForm.items.map((item, index) => {
+                    const selectedItem = items.find(i => i.id == item.id);
+                    const MRP = selectedItem?.mrp || 0;
+                    const gstRate = selectedItem?.gst_percentage || 0;
+                    const baseAmount = item.quantity * item.unit_price;
+                    const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+                    const discountedAmount = baseAmount - itemDiscount;
+                    const gstAmount = (discountedAmount * gstRate) / 100;
+                    const totalWithGst = discountedAmount + gstAmount;
+                    
+                    const filtered = getFilteredItems(itemSearch[index]);
+                    return (
+                      <tr key={index}>
+                        <td className="px-4 py-3">
+                          <div className="relative">
+                            <input
+                              ref={el => (itemInputRefs.current[index] = el)}
+                              type="text"
+                              value={itemSearch[index] || (selectedItem?.name || '')}
+                              onChange={e => {
+                                const value = e.target.value;
+                                setItemSearch(search => ({ ...search, [index]: value }));
+                                setShowItemList(list => ({ ...list, [index]: true }));
+                                setItemDropdownIndex(idx => ({ ...idx, [index]: 0 }));
+                                // Only auto-select if not empty
+                                if (value.trim() !== '') {
+                                  const match = items.find(i => i.name.toLowerCase() === value.toLowerCase());
+                                  if (match) {
+                                    const updatedItems = [...purchaseForm.items];
+                                    updatedItems[index].id = match.id;
+                                    setPurchaseForm({ ...purchaseForm, items: updatedItems });
+                                  }
+                                } else {
+                                  // If input is empty, clear the selected item for this row
+                                  const updatedItems = [...purchaseForm.items];
+                                  updatedItems[index].id = '';
+                                  setPurchaseForm({ ...purchaseForm, items: updatedItems });
+                                }
+                              }}
+                              onFocus={() => setShowItemList(list => ({ ...list, [index]: true }))}
+                              onBlur={() => setTimeout(() => setShowItemList(list => ({ ...list, [index]: false })), 100)}
+                              onKeyDown={e => {
+                                const filtered = getFilteredItems(itemSearch[index]);
+                                if ((e.key === 'Enter' || e.key === 'Tab') && filtered.length > 0) {
+                                  // Select the first filtered item on Enter/Tab
+                                  handleItemSelect(filtered[itemDropdownIndex[index] || 0] || filtered[0], index);
+                                  e.preventDefault();
+                                  // Move focus to quantity input
+                                  document.getElementById(`qty-input-${index}`)?.focus();
+                                } else {
+                                  handleItemInputKeyDown(e, index);
+                                }
+                              }}
+                              placeholder="Type to search item"
+                              className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                              autoComplete="off"
+                              tabIndex={0}
+                            />
+                            <DropdownPortal
+                              anchorRef={{ current: itemInputRefs.current[index] }}
+                              show={showItemList[index] && filtered.length > 0}
+                            >
+                              <ul
+                                className="bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full"
+                                style={{ minWidth: 180, maxHeight: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
+                              >
+                                {filtered.map((itm, idx) => (
+                                  <li
+                                    key={itm.id}
+                                    className={`px-3 py-2 cursor-pointer ${
+                                      idx === (itemDropdownIndex[index] || 0) ? 'bg-blue-100' : ''
+                                    }`}
+                                    onMouseDown={() => handleItemSelect(itm, index)}
+                                    tabIndex={-1}
+                                  >
+                                    {itm.name}
+                                  </li>
+                                ))}
+                              </ul>
+                            </DropdownPortal>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3">
+                          {item.id && (
+                            <button
+                              type="button"
+                              onClick={() => showPurchaseHistory(item.id)}
+                              className="text-gray-400 hover:text-gray-600"
+                              title="Show Purchase History (Ctrl+H)"
+                              tabIndex={-1}
+                            >
+                              <History className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            id={`qty-input-${index}`}
+                            type="number"
+                            onWheel={e => e.target.blur()} 
+                            value={item.quantity}
+                            onChange={(e) => updatePurchaseItem(index, 'quantity', parseInt(e.target.value))}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            min="0"  
+                            tabIndex={0}
+                            onKeyDown={e => {
+                              if (e.key === 'Delete') removePurchaseItem(index);
+                              if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+                                if (item.id) showPurchaseHistory(item.id);
+                              }
+                              if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+                                savePurchase();
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            onWheel={e => e.target.blur()}
+                            value={item.unit_price}
+                            onChange={(e) => updatePurchaseItem(index, 'unit_price', parseFloat(e.target.value))}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            min="0"
+                            tabIndex={0}
+                            onKeyDown={e => {
+                              if (e.key === 'Delete') removePurchaseItem(index);
+                              if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+                                if (item.id) showPurchaseHistory(item.id);
+                              }
+                              if (e.key === 'Tab' && !e.shiftKey) {
+                                // On Tab after unit price, add new item
+                                addItemToPurchase();
+                              }
+                              if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+                                savePurchase();
+                              }
+                            }}
+                          />
+                        </td>
+                         <td className="px-4 py-3 text-center">
+                          <span className="font-medium">₹{MRP}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="font-medium">{gstRate}%</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium">
+                            ₹{baseAmount.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                        <input
+                          type="number"
+                          value={item.discount || 0}
+                          onChange={e => updatePurchaseItem(index, 'discount', parseFloat(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                          max="100"
+                          placeholder="%" 
+                        />
+                      </td>
+                        <td className="px-4 py-3"> 
+                          <span className="font-medium">
+                            ₹{discountedAmount.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium">
+                            ₹{gstAmount.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium">
+                            ₹{totalWithGst.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => removePurchaseItem(index)}
+                            className="text-red-600 hover:text-red-800"
+                            tabIndex={-1}
+                          >  
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Total and Save */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-4 border-t border-gray-200 gap-4">
+          <button
+            onClick={savePurchase}
+            className="flex items-center px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors order-2 md:order-1"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Save Purchase
+          </button>
+          <div className="flex flex-col items-end space-y-1 order-1 md:order-2 w-full md:w-auto">
+            {/* Subtotal */}
+            <div className="flex justify-between w-full md:w-auto">
+              <span className="font-medium text-gray-700 mr-2">Subtotal:</span>
+              <span>
+                ₹{subtotal.toFixed(2)}
+              </span>
+            </div>
+            {/* CGST */}
+            <div className="flex justify-between w-full md:w-auto">
+              <span className="font-medium text-gray-700 mr-2">CGST:</span>
+              <span>
+                ₹{purchaseForm.items.reduce((sum, item) => {
+                  const selectedItem = items.find(i => i.id == item.id);
+                  const gstRate = selectedItem?.gst_percentage || 0;
+                  const baseAmount = item.quantity * item.unit_price;
+                  const cgst = (baseAmount * gstRate) / 200;
+                  return sum + cgst;
+                }, 0).toFixed(2)}
+              </span>
+            </div>
+            {/* SGST */}
+            <div className="flex justify-between w-full md:w-auto">
+              <span className="font-medium text-gray-700 mr-2">SGST:</span>
+              <span>
+                ₹{purchaseForm.items.reduce((sum, item) => {
+                  const selectedItem = items.find(i => i.id == item.id);
+                  const gstRate = selectedItem?.gst_percentage || 0;
+                  const baseAmount = item.quantity * item.unit_price;
+                  const sgst = (baseAmount * gstRate) / 200;
+                  return sum + sgst;
+                }, 0).toFixed(2)}
+              </span>
+            </div>
+             <div className="flex justify-between w-full md:w-auto">
+              <span className="font-medium text-gray-700 mr-2">Total With GST:</span>
+              <span>
+                {totalWithGst} 
+              </span>
+            </div>
+            {/* Rounding Off */}
+            <div className="flex justify-between w-full md:w-auto">
+              <span className='font-medium text-gray-700 mr-2 '>Rounding Off:</span>
+              <span>
+                {getRoundingOff() > 0 ? '+' : '-'}₹{Math.abs(getRoundingOff()).toFixed(2)}
+              </span>
+            </div>
+            
+            {/* Total with GST */}
+            <div className="flex justify-between w-full md:w-auto text-lg font-semibold border-t border-gray-200 pt-2">
+              <span>Grand Total:</span>
+              <span>₹{getFinalTotal().toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Purchase History */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Purchase History</h2>
+        
+        {/* Filters */}
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
+          <input
+            type="text"
+            value={historyFilters.supplier}
+            onChange={e => setHistoryFilters(f => ({ ...f, supplier: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Filter by supplier"
+          />
+          <input
+            type="text"
+            value={historyFilters.invoice}
+            onChange={e => setHistoryFilters(f => ({ ...f, invoice: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Filter by invoice"
+          />
+          <input
+            type="date"
+            value={historyFilters.date}
+            onChange={e => setHistoryFilters(f => ({ ...f, date: e.target.value }))}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Filter by date"
+          />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase No.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredHistory.map((purchase) => (
+                <tr key={purchase.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {purchase.id}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {new Date(purchase.purchase_date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {purchase.invoice_number}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {purchase.supplier_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    ₹{purchase.total_amount.toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        checked={purchase.is_paid === 1}
+                        onChange={(e) => handlePurchasePaidChange(purchase.id, e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      {purchase.is_paid === 1 && purchase.payment_method && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                          {purchase.payment_method.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
+                    {/* Existing action buttons */}
+                    <button
+                      className="text-blue-600 hover:text-blue-800"
+                      onClick={() => navigate(`/purchase/${purchase.id}`)}
+                      tabIndex={-1}
+                      title="View Purchase Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      className="text-red-600 hover:text-red-900"
+                      onClick={() => navigate(`/purchaseupdate/${purchase.id}`)}
+                      tabIndex={-1} 
+                      title="Edit Purchase"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      className="text-black-600 hover:text-black-900"
+                      onClick={() => {
+                        setDeleteId(purchase.id);
+                        setConfirmDeleteOpen(true);
+                      }}
+                      tabIndex={-1}
+                      title="Delete Purchase"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Confirm Delete Modal */}
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Delete Purchase</h2>
+            <p className="mb-2">
+              Are you sure you want to delete this purchase?
+              <br />
+              <span className="text-sm text-gray-700">
+                <strong>Purchase No:</strong> {purchaseHistory.find(p => p.id === deleteId)?.id || 'N/A'}<br />
+                <strong>Invoice:</strong> {purchaseHistory.find(p => p.id === deleteId)?.invoice_number || 'N/A'}<br />
+                <strong>Supplier:</strong> {purchaseHistory.find(p => p.id === deleteId)?.supplier_name || 'N/A'}
+              </span>
+            </p>
+            <p className="mb-6 text-xs text-gray-500">
+              This will revert inventory for all items in this purchase.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
+                onClick={() => setConfirmDeleteOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
+                onClick={async () => {
+                  await handleDeletePurchase(deleteId);
+                  setConfirmDeleteOpen(false);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Supplier Modal */}
+      {showNewSupplierForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Add New Supplier</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <input
+                  type="text" 
+                  value={newSupplier.name}
+                  tabIndex={-1}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact</label>
+                <input
+                  type="text"
+                  value={newSupplier.contact}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, contact: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <textarea
+                  value={newSupplier.address}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows="3"
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={addNewSupplier}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Add Supplier
+              </button>
+              <button
+                onClick={() => setShowNewSupplierForm(false)}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Item History Modal */}
+      {showItemHistory && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowItemHistory(null)}
+        >
+          <div
+            className="bg-white rounded-xl p-8 w-full max-w-3xl max-h-[80vh] overflow-y-auto shadow-2xl relative custom-scroll"
+            style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.25)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Purchase History</h2>
+              <button
+                onClick={() => setShowItemHistory(null)}
+                className="text-white bg-red-600 hover:bg-red-700 rounded-full w-9 h-9 flex items-center justify-center transition-colors"
+                title="Close"
+              >
+                <span className="text-2xl leading-none font-bold">×</span>
+              </button>
+            </div>
+            {itemHistory.length > 0 ? (() => {
+              // Find lowest and highest price records
+              const sortedByPrice = [...itemHistory].sort((a, b) => a.unit_price - b.unit_price);
+              const lowest = sortedByPrice[0];
+              const highest = sortedByPrice[sortedByPrice.length - 1];
+
+              // Remove lowest and highest from the rest (if same record, only show once)
+              const rest = itemHistory
+                .filter(
+                  r =>
+                    r !== lowest &&
+                    r !== highest
+                )
+                .sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date));
+
+              return (
+                <div className="space-y-5">
+                  {/* Lowest Price */}
+                  <div className="border border-green-300 rounded-lg p-5 bg-green-50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <span className="font-semibold text-green-800 text-lg">Lowest Price</span>
+                      <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                        <div>
+                          <span className="font-medium">Supplier:</span> {lowest.supplier_name}
+                        </div>
+                        <div>
+                          <span className="font-medium">Date:</span> {new Date(lowest.purchase_date).toLocaleDateString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Quantity:</span> {lowest.quantity}
+                        </div>
+                        <div>
+                          <span className="font-medium">Price:</span> <span className="text-green-700 font-bold">₹{lowest.unit_price}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Highest Price (only if different from lowest) */}
+                  {highest !== lowest && (
+                    <div className="border border-red-300 rounded-lg p-5 bg-red-50 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <span className="font-semibold text-red-800 text-lg">Highest Price</span>
+                        <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                          <div>
+                            <span className="font-medium">Supplier:</span> {highest.supplier_name}
+                          </div>
+                          <div>
+                            <span className="font-medium">Date:</span> {new Date(highest.purchase_date).toLocaleDateString()}
+                          </div>
+                          <div>
+                            <span className="font-medium">Quantity:</span> {highest.quantity}
+                          </div>
+                          <div>
+                            <span className="font-medium">Price:</span> <span className="text-red-700 font-bold">₹{highest.unit_price}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Rest of the history, sorted by date (recent first) */}
+                  {rest.length > 0 && rest.map((record, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-5">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Supplier:</span> {record.supplier_name}
+                        </div>
+                        <div>
+                          <span className="font-medium">Date:</span> {new Date(record.purchase_date).toLocaleDateString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Quantity:</span> {record.quantity}
+                        </div>
+                        <div>
+                          <span className="font-medium">Price:</span> ₹{record.unit_price}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })() : (
+              <p className="text-gray-600 text-center py-8">No purchase history available</p>
+            )}
+          </div>
+          {/* Custom scrollbar styles */}
+          <style>
+            {`
+              .custom-scroll::-webkit-scrollbar {
+                width: 10px;
+              }
+              .custom-scroll::-webkit-scrollbar-thumb {
+                background: #e5e7eb;
+                border-radius: 8px;
+              }
+              .custom-scroll::-webkit-scrollbar-thumb:hover {
+                background: #cbd5e1;
+              }
+              .custom-scroll::-webkit-scrollbar-track {
+                background: transparent;
+              }
+            `}
+          </style>
+        </div>
+      )}
+
+      {/* Purchase Payment Modal */}
+      {showPurchasePaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-96 overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Record Purchase Payment</h2>
+            
+            {/* Payment Method Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+              <select
+                value={purchasePaymentForm.paymentMethod}
+                onChange={(e) => setPurchasePaymentForm({ 
+                  ...purchasePaymentForm, 
+                  paymentMethod: e.target.value,
+                  paymentDetails: {} 
+                })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="neft_rtgs">NEFT/RTGS</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </div>
+
+            {/* Amount and Date */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                <input
+                  type="number"
+                  value={purchasePaymentForm.amount}
+                  onChange={(e) => setPurchasePaymentForm({ ...purchasePaymentForm, amount: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Date</label>
+                <input
+                  type="date"
+                  value={purchasePaymentForm.paymentDate}
+                  onChange={(e) => setPurchasePaymentForm({ ...purchasePaymentForm, paymentDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Payment Method Specific Fields - Same as SalesHistory.jsx */}
+            {purchasePaymentForm.paymentMethod === 'upi' && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Transaction ID</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.transactionId || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, transactionId: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">UPI ID</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.upiId || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, upiId: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">App Name</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.appName || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, appName: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Reference Number</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.referenceNumber || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, referenceNumber: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {purchasePaymentForm.paymentMethod === 'cash' && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Paid By</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.receivedBy || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, receivedBy: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.receiptNumber || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, receiptNumber: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {purchasePaymentForm.paymentMethod === 'neft_rtgs' && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Reference</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.transactionReference || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, transactionReference: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Transfer Type</label>
+                  <select
+                    value={purchasePaymentForm.paymentDetails.transferType || 'neft'}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, transferType: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="neft">NEFT</option>
+                    <option value="rtgs">RTGS</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Our Bank</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.senderBank || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, senderBank: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Supplier Bank</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.receiverBank || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, receiverBank: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {purchasePaymentForm.paymentMethod === 'cheque' && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Number</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.chequeNumber || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, chequeNumber: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Bank Name</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.bankName || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, bankName: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cheque Date</label>
+                  <input
+                    type="date"
+                    value={purchasePaymentForm.paymentDetails.chequeDate || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, chequeDate: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Issued By</label>
+                  <input
+                    type="text"
+                    value={purchasePaymentForm.paymentDetails.drawerName || ''}
+                    onChange={(e) => setPurchasePaymentForm({
+                      ...purchasePaymentForm,
+                      paymentDetails: { ...purchasePaymentForm.paymentDetails, drawerName: e.target.value }
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
+                onClick={() => {
+                  setShowPurchasePaymentModal(false);
+                  setPendingPurchasePayment(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handlePurchasePaymentSubmit}
+              >
+                Record Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Payment History Modal */}
+      {showPurchasePaymentHistoryModal && purchasePaymentHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-96 overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Purchase Payment History</h2>
+            
+            {purchasePaymentHistory.length > 0 ? (
+              <div className="space-y-4">
+                {purchasePaymentHistory.map((payment, index) => (
+                  <div key={index} className="p-4 bg-gray-50 rounded">
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                      <div><strong>Payment Method:</strong> {payment.payment_method?.toUpperCase()}</div>
+                      <div><strong>Amount:</strong> ₹{payment.amount}</div>
+                      <div><strong>Payment Date:</strong> {payment.payment_date}</div>
+                      <div><strong>Status:</strong> {payment.status}</div>
+                    </div>
+
+                    {/* Method-specific details - Same structure as SalesHistory.jsx */}
+                    {payment.payment_method === 'upi' && payment.details && (
+                      <div className="mt-3 grid grid-cols-2 gap-4 text-sm border-t pt-3">
+                        <div><strong>Transaction ID:</strong> {payment.details.transaction_id || 'N/A'}</div>
+                        <div><strong>UPI ID:</strong> {payment.details.upi_id || 'N/A'}</div>
+                        <div><strong>App Name:</strong> {payment.details.app_name || 'N/A'}</div>
+                        <div><strong>Reference:</strong> {payment.details.reference_number || 'N/A'}</div>
+                      </div>
+                    )}
+
+                    {payment.payment_method === 'cash' && payment.details && (
+                      <div className="mt-3 grid grid-cols-2 gap-4 text-sm border-t pt-3">
+                        <div><strong>Paid By:</strong> {payment.details.received_by || 'N/A'}</div>
+                        <div><strong>Receipt Number:</strong> {payment.details.receipt_number || 'N/A'}</div>
+                      </div>
+                    )}
+
+                    {payment.payment_method === 'neft_rtgs' && payment.details && (
+                      <div className="mt-3 grid grid-cols-2 gap-4 text-sm border-t pt-3">
+                        <div><strong>Transaction Ref:</strong> {payment.details.transaction_reference || 'N/A'}</div>
+                        <div><strong>Transfer Type:</strong> {payment.details.transfer_type?.toUpperCase() || 'N/A'}</div>
+                        <div><strong>Our Bank:</strong> {payment.details.sender_bank || 'N/A'}</div>
+                        <div><strong>Supplier Bank:</strong> {payment.details.receiver_bank || 'N/A'}</div>
+                      </div>
+                    )}
+
+                    {payment.payment_method === 'cheque' && payment.details && (
+                      <div className="mt-3 grid grid-cols-2 gap-4 text-sm border-t pt-3">
+                        <div><strong>Cheque Number:</strong> {payment.details.cheque_number || 'N/A'}</div>
+                        <div><strong>Bank Name:</strong> {payment.details.bank_name || 'N/A'}</div>
+                        <div><strong>Cheque Date:</strong> {payment.details.cheque_date || 'N/A'}</div>
+                        <div><strong>Issued By:</strong> {payment.details.drawer_name || 'N/A'}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500">
+                No payment history found
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
+                onClick={() => {
+                  setShowPurchasePaymentHistoryModal(false);
+                  setPurchasePaymentHistory(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+       {/* <ToastContainer position="top-right" autoClose={3000} /> */}
+    </div>
+  );
+}; 
+
+export default Purchase;
