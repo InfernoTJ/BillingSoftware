@@ -50,14 +50,14 @@ const Contactus = () => {
                     <MapPin className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Office Address</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Testing Address</h3>
                     <p className="text-gray-600 leading-relaxed">
                       425 Business Center Drive<br />
-                      Suite 200<br />
-                      New York, NY 10001<br />
-                      United States
+                      Suite 200<br />        
+                      Devkar Panand<br /> 
+                      India
                     </p>
-                  </div>
+                  </div>  
                 </div>
               </div>
 

@@ -379,126 +379,173 @@ app.on('activate', () => {
 
 // IPC handlers for database operations
 ipcMain.handle('login', async (event, username, password) => {
-  // Query your users table and return user object if valid, else null
-  const user = db.prepare('SELECT id, username FROM users WHERE username = ? AND password = ?').get(username, password);
-  return user || null;
+  try {
+    // Query your users table and return user object if valid, else null
+    const user = db.prepare('SELECT id, username FROM users WHERE username = ? AND password = ?').get(username, password);
+    return user || null;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 ipcMain.handle('verify-pin', async (event, pin) => {
-  return pin === '2020';   
+  try {
+    return pin === '2020';
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });  
 
 ipcMain.handle('get-dashboard-data', async () => {
-const totalSales = db.prepare(`
-  SELECT COALESCE(SUM(total_amount), 0) as total 
-  FROM sales  
-  WHERE sale_date >= date('now', '-30 days')
-`).get();
-  const totalItems = db.prepare('SELECT COUNT(*) as count FROM items where (status_code = 0 OR status_code IS NULL)').get();
-  const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM items WHERE current_stock <= minimum_stock and (status_code = 0 OR status_code IS NULL)').get();
-  const totalInventoryValue = db.prepare('SELECT COALESCE(SUM(current_stock * mrp), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)').get();
-   
-  const recentSales = db.prepare(`
-    SELECT DATE(sale_date) as date, SUM(total_amount) as amount 
-    FROM sales 
-    WHERE sale_date >= date('now', '-30 days')
-    GROUP BY DATE(sale_date) 
-    ORDER BY sale_date DESC 
-    LIMIT 30 
-  `).all();
-  
-  const lowStockItemsList = db.prepare(`
-    SELECT i.name, i.current_stock, i.minimum_stock, c.name as category
-    FROM items i 
-    LEFT JOIN categories c ON i.category_id = c.id
-    WHERE i.current_stock <= i.minimum_stock and (i.status_code = 0 OR i.status_code IS NULL)
-    LIMIT 10
-  `).all();
-
-  return {
-    totalSales: totalSales.total,
-    totalItems: totalItems.count,
-    lowStockCount: lowStockItems.count,
-    totalInventoryValue: totalInventoryValue.total,
-    salesChart: recentSales,
-    lowStockItems: lowStockItemsList
-  };
+  try {
+    const totalSales = db.prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) as total 
+      FROM sales  
+      WHERE sale_date >= date('now', '-30 days')
+    `).get();
+    const totalItems = db.prepare('SELECT COUNT(*) as count FROM items where (status_code = 0 OR status_code IS NULL)').get();
+    const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM items WHERE current_stock <= minimum_stock and (status_code = 0 OR status_code IS NULL)').get();
+    const totalInventoryValue = db.prepare('SELECT COALESCE(SUM(current_stock * mrp), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)').get();
+    const recentSales = db.prepare(`
+      SELECT DATE(sale_date) as date, SUM(total_amount) as amount 
+      FROM sales 
+      WHERE sale_date >= date('now', '-30 days')
+      GROUP BY DATE(sale_date) 
+      ORDER BY sale_date DESC 
+      LIMIT 30 
+    `).all();
+    const lowStockItemsList = db.prepare(`
+      SELECT i.name, i.current_stock, i.minimum_stock, c.name as category
+      FROM items i 
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE i.current_stock <= i.minimum_stock and (i.status_code = 0 OR i.status_code IS NULL)
+      LIMIT 10
+    `).all();
+    return {
+      totalSales: totalSales.total,
+      totalItems: totalItems.count,
+      lowStockCount: lowStockItems.count,
+      totalInventoryValue: totalInventoryValue.total,
+      salesChart: recentSales,
+      lowStockItems: lowStockItemsList
+    };
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 ipcMain.handle('get-inventory', async () => {
-  const items = db.prepare(`
-    SELECT i.*, c.name as category_name, s.name as supplier_name, s.gstin as supplier_gstin
-    FROM items i
-    LEFT JOIN categories c ON i.category_id = c.id
-    LEFT JOIN suppliers s ON i.last_supplier_id = s.id
-    WHERE (i.status_code = 0 OR i.status_code IS NULL)
-    ORDER BY i.name
-  `).all();
-  return items;
+  try {
+    const items = db.prepare(`
+      SELECT i.*, c.name as category_name, s.name as supplier_name, s.gstin as supplier_gstin
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      LEFT JOIN suppliers s ON i.last_supplier_id = s.id
+      WHERE (i.status_code = 0 OR i.status_code IS NULL)
+      ORDER BY i.name
+    `).all();
+    return items;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 // Add this IPC handler to check SKU uniqueness
 ipcMain.handle('check-sku-exists', async (event, sku, excludeId = null) => {
-  let query = 'SELECT id FROM items WHERE sku = ? AND (status_code = 0 OR status_code IS NULL)';
-  let params = [sku];
-  if (excludeId) {
-    query += ' AND id != ?'; 
-    params.push(excludeId);
-  } 
-  const row = db.prepare(query).get(...params);
-  return !!row;
+  try {
+    let query = 'SELECT id FROM items WHERE sku = ? AND (status_code = 0 OR status_code IS NULL)';
+    let params = [sku];
+    if (excludeId) {
+      query += ' AND id != ?'; 
+      params.push(excludeId);
+    } 
+    const row = db.prepare(query).get(...params);
+    return !!row;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 ipcMain.handle('check-category-exists', async (event, name, excludeId = null) => {
-  let query = 'SELECT id FROM categories WHERE name = ? AND (status_code = 0 OR status_code IS NULL)';
-  let params = [name ];
-  if (excludeId) {
-    query += ' AND id != ?'; 
-    params.push(excludeId);
-  } 
-  const row = db.prepare(query).get(...params);
-  return !!row;
+  try {
+    let query = 'SELECT id FROM categories WHERE name = ? AND (status_code = 0 OR status_code IS NULL)';
+    let params = [name ];
+    if (excludeId) {
+      query += ' AND id != ?'; 
+      params.push(excludeId);
+    } 
+    const row = db.prepare(query).get(...params);
+    return !!row;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 ipcMain.handle('check-gst-exists', async (event, rate, excludeId = null) => {
-  let query = 'SELECT id FROM gst_rates WHERE rate = ? AND (status_code = 0 OR status_code IS NULL)';
-  let params = [rate];
-  if (excludeId) {
-    query += ' AND id != ?'; 
-    params.push(excludeId);
-  } 
-  const row = db.prepare(query).get(...params);
-  return !!row;
+  try {
+    let query = 'SELECT id FROM gst_rates WHERE rate = ? AND (status_code = 0 OR status_code IS NULL)';
+    let params = [rate];
+    if (excludeId) {
+      query += ' AND id != ?'; 
+      params.push(excludeId);
+    } 
+    const row = db.prepare(query).get(...params);
+    return !!row;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 // Modify add-item to check SKU before insert
 ipcMain.handle('add-item', async (event, itemData) => {
-  // Check for duplicate SKU
-  const exists = db.prepare('SELECT id FROM items WHERE sku = ? AND (status_code = 0 OR status_code IS NULL)').get(itemData.sku);
-  if (exists) {
-    // Throw error to be caught in renderer
-    throw new Error('SKU already exists');
+  try {
+    // Check for duplicate SKU
+    const exists = db.prepare('SELECT id FROM items WHERE sku = ? AND (status_code = 0 OR status_code IS NULL)').get(itemData.sku);
+    if (exists) {
+      // Throw error to be caught in renderer
+      throw new Error('SKU already exists');
+    }
+    const stmt = db.prepare('INSERT INTO items (name, sku, hsn_code, description, unit, mrp, purchase_rate, sale_rate, gst_percentage, category_id, current_stock, minimum_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    const result = stmt.run(itemData.name, itemData.sku, itemData.hsn_code, itemData.description, itemData.unit, itemData.mrp, itemData.purchase_rate, itemData.sale_rate, itemData.gst_percentage, itemData.category_id, itemData.current_stock, itemData.minimum_stock);
+    return { id: result.lastInsertRowid, ...itemData };
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
-  const stmt = db.prepare('INSERT INTO items (name, sku, hsn_code, description, unit, mrp, purchase_rate, sale_rate, gst_percentage, category_id, current_stock, minimum_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  const result = stmt.run(itemData.name, itemData.sku, itemData.hsn_code, itemData.description, itemData.unit, itemData.mrp, itemData.purchase_rate, itemData.sale_rate, itemData.gst_percentage, itemData.category_id, itemData.current_stock, itemData.minimum_stock);
-  return { id: result.lastInsertRowid, ...itemData };
 });
 
 // Modify update-item to check SKU before update (exclude current id)
 ipcMain.handle('update-item', async (event, { id, sku, ...rest }) => {
-  const exists = db.prepare('SELECT id FROM items WHERE sku = ? AND id != ? AND (status_code = 0 OR status_code IS NULL)').get(sku, id);
-  if (exists) {
-    throw new Error('SKU already exists');
+  try {
+    const exists = db.prepare('SELECT id FROM items WHERE sku = ? AND id != ? AND (status_code = 0 OR status_code IS NULL)').get(sku, id);
+    if (exists) {
+      throw new Error('SKU already exists');
+    }
+    const stmt = db.prepare('UPDATE items SET name = ?, sku = ?, hsn_code = ?, description = ?, unit = ?, mrp = ?, purchase_rate = ?, sale_rate = ?, gst_percentage = ?, category_id = ?, current_stock = ?, minimum_stock = ? WHERE id = ?');
+    const result = stmt.run(rest.name, sku, rest.hsn_code, rest.description, rest.unit, rest.mrp, rest.purchase_rate, rest.sale_rate, rest.gst_percentage, rest.category_id, rest.current_stock, rest.minimum_stock, id);
+    return result.changes > 0;
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
-  const stmt = db.prepare('UPDATE items SET name = ?, sku = ?, hsn_code = ?, description = ?, unit = ?, mrp = ?, purchase_rate = ?, sale_rate = ?, gst_percentage = ?, category_id = ?, current_stock = ?, minimum_stock = ? WHERE id = ?');
-  const result = stmt.run(rest.name, sku, rest.hsn_code, rest.description, rest.unit, rest.mrp, rest.purchase_rate, rest.sale_rate, rest.gst_percentage, rest.category_id, rest.current_stock, rest.minimum_stock, id);
-  return result.changes > 0;
 });
 
 ipcMain.handle('delete-item', async (event, id) => {
-  const stmt = db.prepare('UPDATE items SET status_code = 1 WHERE id = ?');
-  const result = stmt.run(id);
-  return result.changes > 0;
+  try {
+    const stmt = db.prepare('UPDATE items SET status_code = 1 WHERE id = ?');
+    const result = stmt.run(id);
+    return result.changes > 0;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 });
 
 ipcMain.handle('get-categories', async () => {

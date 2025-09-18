@@ -1,1 +1,1 @@
-select * from payment_verification
+select * from license
