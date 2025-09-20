@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
   
 node_modules/
+  
+backups/
+database.db
 dist-electron/
 dist/
 dist-ssr/
@@ -24,3 +27,4 @@ dist-ssr/
 *.sln
 *.sw?
 .env
+database.db
