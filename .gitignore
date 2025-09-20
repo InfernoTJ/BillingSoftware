@@ -9,13 +9,13 @@ lerna-debug.log*
   
 node_modules/
   
-backups/
+backups/ 
 database.db
 dist-electron/
-dist/
+dist/ 
 dist-ssr/
 *.local
-
+src/components/ss.sql
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
