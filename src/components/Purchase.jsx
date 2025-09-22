@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Eye,
   History,
-  Edit3
+  Edit3,
+  FileText
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -18,6 +19,9 @@ import { useNavigate } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 
 import PinProtected from './reusables/PinProtected';
+import PurchasePDF from './PurchasePDF';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const DropdownPortal = ({ children, anchorRef, show }) => {
   const [style, setStyle] = useState({});
@@ -527,7 +531,89 @@ const handlePurchasePaymentSubmit = async () => {
   };
   const getFinalTotal = () => Math.round(totalWithGst);
  
-  
+  const handleReprintPurchase = async (purchaseId) => {
+    try {
+      // Fetch purchase details from backend
+      const purchaseDetails = await window.electronAPI.getPurchaseDetails(purchaseId);
+      console.log('purchaseDetails:', purchaseDetails);
+
+      // Defensive mapping for supplier from purchaseDetails.purchase
+      const supplier = {
+        name: purchaseDetails.purchase.supplier_name || "",
+        address: purchaseDetails.purchase.supplier_address || "",
+        gstin: purchaseDetails.purchase.supplier_gstin || "",
+        contact: purchaseDetails.purchase.supplier_contact || ""
+      };
+
+      // Defensive mapping for items from purchaseDetails.items
+      const items = (purchaseDetails.items || []).map(item => ({
+        hsn_code: item.hsn_code || "",
+        sku: item.sku || "",
+        name: item.item_name || "",
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        gst_percentage: item.gst_percentage || 0,
+        total_price: item.total_price || 0
+      }));
+
+      // Use purchaseDetails.purchase for all purchase fields
+      const purchaseNumber = purchaseDetails.purchase.id || purchaseDetails.purchase.invoice_number || "";
+      const invoiceNumber = purchaseDetails.purchase.invoice_number || "";
+      const purchaseDate = purchaseDetails.purchase.purchase_date
+        ? new Date(purchaseDetails.purchase.purchase_date).toLocaleDateString()
+        : "";
+
+      // Calculate subtotal if not provided
+      const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+
+      // Create a hidden container for rendering the PDF
+      const pdfContainer = document.createElement('div');
+      pdfContainer.style.position = 'fixed';
+      pdfContainer.style.left = '-9999px';
+      pdfContainer.style.top = '0';
+      pdfContainer.style.width = '800px';
+      pdfContainer.style.zIndex = '-1';
+      document.body.appendChild(pdfContainer);
+
+      // Render PurchasePDF
+      import('react-dom/client').then(({ createRoot }) => {
+        const root = createRoot(pdfContainer);
+        root.render(
+          <PurchasePDF
+            purchaseNumber={purchaseNumber}
+            invoiceNumber={invoiceNumber}
+            purchaseDate={purchaseDate}
+            supplier={supplier}
+            items={items}
+            discount={purchaseDetails.purchase.discount || 0}
+            subtotal={subtotal}
+            roundingOff={purchaseDetails.purchase.rounding_off || 0}
+            total={purchaseDetails.purchase.total_amount || subtotal}
+          />
+        );
+        setTimeout(async () => {
+          const canvas = await html2canvas(pdfContainer, { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+          });
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfWidth = pageWidth;
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`Purchase_${invoiceNumber || purchaseNumber || purchaseId}.pdf`);
+          root.unmount();
+          document.body.removeChild(pdfContainer);
+          toast.success('PDF generated!');
+        }, 300);
+      });
+    } catch (error) {
+      toast.error('Error generating PDF');
+    }
+  };
 
   if (loading) {
     return (
@@ -848,6 +934,7 @@ const handlePurchasePaymentSubmit = async () => {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
+                        
                       </tr>
                     );
                   })}
@@ -1027,6 +1114,13 @@ const handlePurchasePaymentSubmit = async () => {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                   <button
+                    onClick={() => handleReprintPurchase(purchase.id)}
+                    className="text-purple-600 hover:text-purple-900"
+                    title="Reprint Purchase"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button> 
                   </td>
                 </tr>
               ))}
@@ -1584,6 +1678,7 @@ const handlePurchasePaymentSubmit = async () => {
                 }}
               >
                 Close
+                
               </button>
             </div>
           </div>
@@ -1591,6 +1686,7 @@ const handlePurchasePaymentSubmit = async () => {
       )}
        {/* <ToastContainer position="top-right" autoClose={3000} /> */}
     </div>
+  
     </PinProtected>
   ); 
 }; 
