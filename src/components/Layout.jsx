@@ -3,8 +3,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
-  ShoppingCart, 
-  Receipt,
+  ShoppingCart,  
+  ReceiptIndianRupee,
   FileText,
   BookOpen, 
   Download, 
@@ -24,13 +24,15 @@ import 'react-toastify/dist/ReactToastify.css';
 const Layout = ({ children, user, onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation(); 
+  const [overallDiscount, setOverallDiscount] = useState(0);
+
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Inventory', href: '/inventory', icon: Package },
     { name: 'Purchase', href: '/purchase', icon: ShoppingCart },
     { name: 'Purchase Order', href: '/purchase-order', icon: ClipboardList },
-    { name: 'Billing', href: '/billing', icon: Receipt },
+    { name: 'Billing', href: '/billing', icon: ReceiptIndianRupee },
     { name: 'Sales History', href: '/sales-history', icon: FileText },
     { name: 'Ledger', href: '/ledger', icon: BookOpen }, 
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },

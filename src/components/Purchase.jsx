@@ -5,7 +5,7 @@ import {
   Trash2, 
   Save, 
   Lock,
-  Calendar,
+  Calendar,       
   Package,
   RefreshCw,
   Eye,
@@ -52,7 +52,7 @@ const Purchase = () => {
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showNewSupplierForm, setShowNewSupplierForm] = useState(false);
-  
+  const [overallDiscount, setOverallDiscount] = useState(0);
 
 const [categories, setCategories] = useState([]);
 const [units, setUnits] = useState([]);
@@ -285,12 +285,23 @@ const handlePurchasePaymentSubmit = async () => {
     }
   };
 
-
-
+const updateOverallDiscount = (newDiscount) => {
+  setOverallDiscount(newDiscount);
+  
+  // Apply to all existing items that haven't been manually changed
+  setPurchaseForm(prev => ({
+    ...prev,
+    items: prev.items.map(item => ({
+      ...item,
+      discount: newDiscount
+    }))
+  }));
+};
   const addItemToPurchase = () => { 
     setPurchaseForm({
       ...purchaseForm,
-      items: [...purchaseForm.items, { id: '', quantity: '', unit_price: '', total_price: 0, discount: 0 }]
+      items: [...purchaseForm.items, { id: '', quantity: '', unit_price: '', total_price: 0, 
+      discount: overallDiscount }]
     });
   };
 
@@ -388,37 +399,43 @@ const handlePurchasePaymentSubmit = async () => {
 
     const total_amount = getFinalTotal();
     const rounding_off = getRoundingOff();
+ 
+    const cgst_total = purchaseForm.items.reduce((sum, item) => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  return sum + (discountedAmount * gstRate) / 200;
+}, 0);
 
-      const cgst_total = purchaseForm.items.reduce((sum, item) => {
-    const selectedItem = items.find(i => i.id == item.id);
-    const gstRate = selectedItem?.gst_percentage || 0;
-    const baseAmount = item.quantity * item.unit_price;
-    return sum + (baseAmount * gstRate) / 200;
-  }, 0); 
-
-  const sgst_total = purchaseForm.items.reduce((sum, item) => {
-    const selectedItem = items.find(i => i.id == item.id);
-    const gstRate = selectedItem?.gst_percentage || 0;
-    const baseAmount = item.quantity * item.unit_price;
-    return sum + (baseAmount * gstRate) / 200;
-  }, 0);
+const sgst_total = purchaseForm.items.reduce((sum, item) => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  return sum + (discountedAmount * gstRate) / 200;
+}, 0);
 
     // Calculate GST for each valid item
-    const itemsWithGST = validItems.map(item => {
-      const selectedItem = items.find(i => i.id == item.id);
-      const baseAmount = item.quantity * item.unit_price;
-      const gstRate = selectedItem?.gst_percentage || 0;
-      const cgstAmount = (baseAmount * gstRate) / 200;
-      const sgstAmount = (baseAmount * gstRate) / 200;
-      const totalPrice = baseAmount + cgstAmount + sgstAmount;
-      return {
-        ...item,
-        gst_percentage: gstRate,
-        cgst_amount: cgstAmount,
-        sgst_amount: sgstAmount,
-        total_price: totalPrice
-      };
-    });
+const itemsWithGST = validItems.map(item => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const cgstAmount = (discountedAmount * gstRate) / 200;
+  const sgstAmount = (discountedAmount * gstRate) / 200;
+  const totalPrice = discountedAmount + cgstAmount + sgstAmount;
+  return {
+    ...item, 
+    gst_percentage: gstRate,
+    cgst_amount: cgstAmount,
+    sgst_amount: sgstAmount,
+    total_price: totalPrice
+  };
+});
 
  
 
@@ -752,15 +769,15 @@ const getFilteredItems = (search) =>
           {/* Supplier Dropdown */}
           <div>
           <div className="flex items-center mb-2">
-    <label className="block text-sm font-medium text-gray-700">Supplier</label>
-    <button
-      onClick={() => setShowNewSupplierForm(true)}
-      className="ml-2 px-1 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-      tabIndex={0}
-    >
-      <Plus className="w-4 h-4" />
-    </button>
-  </div>
+        <label className="block text-sm font-medium text-gray-700">Supplier</label>
+        <button
+          onClick={() => setShowNewSupplierForm(true)}
+          className="ml-2 px-1 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          tabIndex={-1}
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
             
             <div className="relative">
               <input
@@ -826,6 +843,21 @@ const getFilteredItems = (search) =>
               tabIndex={0}
             />
           </div>
+
+          <div>
+          <label className="block text-base font-medium text-gray-700 mb-2">Overall Discount (%)</label>
+          <input
+            type="number"
+            value={overallDiscount}
+            onChange={(e) => updateOverallDiscount(parseFloat(e.target.value) || 0)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="0"
+            min="0"
+            max="100"
+            step="0.01"
+            tabIndex={0}
+          />
+        </div>
         </div>
 
         {/* Items Table */}
@@ -838,7 +870,7 @@ const getFilteredItems = (search) =>
                 className="px-1 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 title="Add New Item"
                 type="button"
-                tabIndex={0}
+                 tabIndex={-1}
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -879,10 +911,18 @@ const getFilteredItems = (search) =>
                     const gstRate = selectedItem?.gst_percentage || 0;
                     const baseAmount = item.quantity * item.unit_price;
                     const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
-                    const discountedAmount = baseAmount - itemDiscount;
+                    const discountedAmount = baseAmount - itemDiscount; 
                     const gstAmount = (discountedAmount * gstRate) / 100;
                     const totalWithGst = discountedAmount + gstAmount;
-                    
+                    console.log({
+                      quantity: item.quantity,
+                      unit_price: item.unit_price,
+                      baseAmount,
+                      itemDiscount,
+                      discountedAmount,
+                      gstRate,
+                      gstAmount
+                    });
                     const filtered = getFilteredItems(itemSearch[index]);
                     return (
                       <tr key={index}>
