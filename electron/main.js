@@ -760,6 +760,8 @@ ipcMain.handle('save-sale', async (event, { bill_number, customer_name, customer
   items.forEach(item => {
     saleItemStmt.run(saleId, item.id, item.quantity, item.unit_price, item.total_price);
     updateStockStmt.run(item.quantity, item.id);
+
+     reduceClosingStock(item.id, item.quantity);
   });
 
   return { success: true, saleId };
@@ -919,7 +921,7 @@ ipcMain.handle('backup-database', async () => {
   try {
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Backup Database',
-      defaultPath: `stationery_backup_${new Date().toISOString().split('T')[0]}.db`,
+      defaultPath: `billing_software_backup_${new Date().toISOString().split('T')[0]}.db`,
       filters: [{ name: 'Database Files', extensions: ['db'] }]
     });
 
@@ -1313,14 +1315,14 @@ function autoBackupDatabase() {
       const backupDir = isDev 
         ? path.join(__dirname, '..', 'backups')
         : path.join(process.resourcesPath, 'backups');
-
+ 
       if (!fs.existsSync(backupDir)) {
         fs.mkdirSync(backupDir, { recursive: true });
       }
 
       const backupFile = path.join(
         backupDir,
-        `stationery_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`
+        `billing_software_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`
       );
 
       db.backup(backupFile)
@@ -1534,6 +1536,7 @@ ipcMain.handle('update-sale', async (event, saleId, updatedSale) => {
       parseFloat(item.unit_price),
       parseFloat(item.total_price)
     );
+     reduceClosingStock(item.id, parseFloat(item.quantity));
   });
 
   return { success: true };
@@ -2369,3 +2372,16 @@ ipcMain.handle('get-closing-stock', async (event, itemId) => {
     'SELECT * FROM closing_stock WHERE item_id = ? ORDER BY closing_date DESC LIMIT 1'
   ).get(itemId);
 });
+
+
+function reduceClosingStock(itemId, qtySold) {
+  // Get latest closing stock for the item
+  const closing = db.prepare('SELECT * FROM closing_stock WHERE item_id = ? ORDER BY closing_date DESC LIMIT 1').get(itemId);
+  if (closing) {
+    let newQty = closing.closing_qty - qtySold;
+    if (newQty < 0) newQty = 0;
+    let newAmount = newQty * closing.purchase_rate;
+    db.prepare('UPDATE closing_stock SET closing_qty = ?, closing_amount = ? WHERE id = ?')
+      .run(newQty, newAmount, closing.id);
+  }
+}
