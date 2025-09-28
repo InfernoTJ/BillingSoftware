@@ -206,79 +206,88 @@ const Admin = () => {
  
   // Product management
   const handleAddProduct = async () => {
-    const errors = validateProductForm(productForm);
-    if (Object.keys(errors).length) {
-      setProductErrors(errors);
-      console.log('Product form errors:', errors);
-      toast.error('Please fill all required fields');
-      return; 
-    } 
-    try {
-      if (window.electronAPI) {
-        // SKU uniqueness check before add
-        const skuExists = await window.electronAPI.checkSkuExists(productForm.sku);
-       
-        
-        if (skuExists) { 
-          setProductErrors({ ...errors, sku: 'SKU already exists' });
-          toast.error('SKU already exists');
-          return;
-        }
-        const payload = buildProductPayload(productForm);
-        const newProduct = await window.electronAPI.addItem(payload);
-        toast.success('Product added successfully');
-        setProducts([...products, newProduct]);
-      }
-      
-      setShowProductForm(false);
-      setProductForm(initialProductForm);
-      setProductErrors({});
-    } catch (error) {
-      if (error?.message?.includes('SKU already exists')) {
-        setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+  const errors = validateProductForm(productForm);
+  if (Object.keys(errors).length) {
+    setProductErrors(errors);
+    toast.error('Please fill all required fields');
+    return;
+  }
+  try { 
+    if (window.electronAPI) {
+      const skuExists = await window.electronAPI.checkSkuExists(productForm.sku);
+      if (skuExists) {
+        setProductErrors({ ...errors, sku: 'SKU already exists' });
         toast.error('SKU already exists');
-      } else {
-        toast.error('Error adding product');
-        console.error('Error adding product:', error);
+        return;
       }
-    }
-  };
+      const payload = buildProductPayload(productForm);
+      const newProduct = await window.electronAPI.addItem(payload);
 
-  const handleUpdateProduct = async () => {
-    const errors = validateProductForm(productForm);
-    if (Object.keys(errors).length) {
-      setProductErrors(errors);
-      return;
+      // --- Update closing stock after adding product ---
+      await window.electronAPI.updateClosingStock({
+        itemId: newProduct.id,
+        qty: payload.current_stock,
+        purchaseRate: payload.purchase_rate
+      });
+
+      toast.success('Product added successfully');
+      setProducts([...products, newProduct]);
     }
-    try {
-      if (window.electronAPI) {
-        // SKU uniqueness check before update (exclude current id)
-        const skuExists = await window.electronAPI.checkSkuExists(productForm.sku, editingItem);
-        console.log(' sku edit :' + skuExists)
-        if (skuExists) {
-          setProductErrors({ ...errors, sku: 'SKU already exists' });
-          toast.error('SKU already exists');
-          return;
-        }
-        const payload = { id: editingItem, ...buildProductPayload(productForm) };
-        await window.electronAPI.updateItem(payload);
-        toast.success('Product updated successfully');
-        await loadAllData();
-      }
-      setEditingItem(null);
-      setProductForm(initialProductForm);
-      setShowProductForm(false);
-      setProductErrors({});
-    } catch (error) {
-      if (error?.message?.includes('SKU already exists')) {
-        setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+    setShowProductForm(false);
+    setProductForm(initialProductForm);
+    setProductErrors({});
+  } catch (error) {
+    if (error?.message?.includes('SKU already exists')) {
+      setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+      toast.error('SKU already exists');
+    } else {
+      toast.error('Error adding product');
+      console.error('Error adding product:', error);
+    }
+  }
+};
+
+const handleUpdateProduct = async () => {
+  const errors = validateProductForm(productForm);
+  if (Object.keys(errors).length) {
+    setProductErrors(errors);
+    return;
+  }
+  try {
+    if (window.electronAPI) {
+      const skuExists = await window.electronAPI.checkSkuExists(productForm.sku, editingItem);
+      if (skuExists) {
+        setProductErrors({ ...errors, sku: 'SKU already exists' });
         toast.error('SKU already exists');
-      } else {
-        toast.error('Error updating product');
-        console.error('Error updating product:', error);
+        return;
       }
+      const payload = { id: editingItem, ...buildProductPayload(productForm) };
+      await window.electronAPI.updateItem(payload);
+
+      // --- Update closing stock after editing product ---
+      await window.electronAPI.updateClosingStock({
+        itemId: editingItem,
+        qty: payload.current_stock,
+        purchaseRate: payload.purchase_rate
+      });
+
+      toast.success('Product updated successfully');
+      await loadAllData();
     }
-  };
+    setEditingItem(null); 
+    setProductForm(initialProductForm);
+    setShowProductForm(false);
+    setProductErrors({});
+  } catch (error) {
+    if (error?.message?.includes('SKU already exists')) {
+      setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+      toast.error('SKU already exists');
+    } else {
+      toast.error('Error updating product');
+      console.error('Error updating product:', error);
+    }
+  }
+};
 
   const handleDeleteProduct = async (id) => {
     setConfirmMessage('Are you sure you want to delete this product?');

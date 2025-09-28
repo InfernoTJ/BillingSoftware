@@ -272,6 +272,16 @@ CREATE TABLE IF NOT EXISTS payment_cheque (
   FOREIGN KEY (payment_verification_id) REFERENCES payment_verification (id)
 );
 
+CREATE TABLE IF NOT EXISTS closing_stock (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER,
+  closing_date TEXT,
+  closing_qty REAL,
+  purchase_rate REAL,
+  closing_amount REAL,
+  FOREIGN KEY(item_id) REFERENCES items(id)
+);
+
   `);
 
   // Insert default data
@@ -324,7 +334,37 @@ CREATE TABLE IF NOT EXISTS payment_cheque (
   // ];
   // const gstStmt = db.prepare('INSERT OR IGNORE INTO gst_rates (rate, description) VALUES (?, ?)');
   // gstRates.forEach(gst => gstStmt.run(gst.rate, gst.description));
+
+
+
+//   setTableIdStart('users', 101);
+// setTableIdStart('categories', 3001);
+// setTableIdStart('suppliers', 2001);
+// setTableIdStart('items', 1001);
+// setTableIdStart('purchases', 1);
+// setTableIdStart('purchase_items', 6001);
+// setTableIdStart('sales', 7001);
+// setTableIdStart('sale_items', 8001);
+// setTableIdStart('customer', 9001);
+// setTableIdStart('units', 4001);
+// setTableIdStart('gst_rates', 5001);
+// setTableIdStart('salesman', 6001);
+// setTableIdStart('closing_stock', 13001);
+
+
+//   function setTableIdStart(table, start) {
+//   // Check if entry exists
+//   const exists = db.prepare('SELECT 1 FROM sqlite_sequence WHERE name = ?').get(table);
+//   if (exists) {
+//     db.prepare('UPDATE sqlite_sequence SET seq = ? WHERE name = ?').run(start - 1, table);
+//   } else {
+//     db.prepare('INSERT INTO sqlite_sequence (name, seq) VALUES (?, ?)').run(table, start - 1);
+//   }
+// }
 }
+
+
+
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -2307,4 +2347,25 @@ ipcMain.handle('get-app-info', async () => {
     builtWith: pkg.builtWith || [],
     changelog: pkg.changelog || ''
   };
+});
+
+ipcMain.handle('update-closing-stock', async (event, { itemId, qty, purchaseRate }) => {
+  const closingDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const closingAmount = qty * purchaseRate;
+  // Upsert logic: update if exists for today, else insert
+  const existing = db.prepare('SELECT id FROM closing_stock WHERE item_id = ? AND closing_date = ?').get(itemId, closingDate);
+  if (existing) {
+    db.prepare('UPDATE closing_stock SET closing_qty = ?, purchase_rate = ?, closing_amount = ? WHERE id = ?')
+      .run(qty, purchaseRate, closingAmount, existing.id);
+  } else {
+    db.prepare('INSERT INTO closing_stock (item_id, closing_date, closing_qty, purchase_rate, closing_amount) VALUES (?, ?, ?, ?, ?)')
+      .run(itemId, closingDate, qty, purchaseRate, closingAmount);
+  }
+  return true;
+});
+
+ipcMain.handle('get-closing-stock', async (event, itemId) => {
+  return db.prepare(
+    'SELECT * FROM closing_stock WHERE item_id = ? ORDER BY closing_date DESC LIMIT 1'
+  ).get(itemId);
 });

@@ -116,7 +116,9 @@ getPurchasePaymentDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-paym
     getExportSalesData: (startDate, endDate) => ipcRenderer.invoke('get-export-sales-data', startDate, endDate),
       getExportPurchaseData: (startDate, endDate) => ipcRenderer.invoke('get-export-purchase-data', startDate, endDate),
 
-
+//closing stock 
+  updateClosingStock: (data) => ipcRenderer.invoke('update-closing-stock', data),
+  getClosingStock: (itemId) => ipcRenderer.invoke('get-closing-stock', itemId),
 
 
 
