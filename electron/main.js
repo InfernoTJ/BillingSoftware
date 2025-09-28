@@ -19,7 +19,13 @@ const dbPath = isDev
   ? path.join(__dirname, '..', 'database.db')
   : path.join(process.resourcesPath, 'database.db');
 
-const exePath = isDev
+
+const packageJsonPath = isDev
+  ? path.join(__dirname, '..', 'package.json')
+  : path.join(process.resourcesPath, 'package.json');
+
+
+const exePath = isDev 
   ? path.join(__dirname, "..", "get_machine_id.exe") // dev path
   : path.join(process.resourcesPath, "get_machine_id.exe"); // prod path
 
@@ -357,11 +363,11 @@ app.whenReady().then(() => {
   initDatabase();
   const id = getPythonMachineId();
   // License check AFTER db is initialized
-  if (!validateLicense()) {
-    dialog.showErrorBox('License Error', 'This software is not activated for this computer. ' );
-    app.quit();
-    return; 
-  }
+  // if (!validateLicense()) {
+  //   dialog.showErrorBox('License Error', 'This software is not activated for this computer. ' );
+  //   app.quit();
+  //   return; 
+  // }
 
   createWindow(); 
 });
@@ -2243,4 +2249,62 @@ ipcMain.handle('get-export-purchase-data', async (event, { startDate, endDate })
     GROUP BY p.id
     ORDER BY p.purchase_date DESC
   `).all(startDate, endDate);
+});
+
+
+// Get all customers
+ipcMain.handle('get-customers', async () => {
+  return db.prepare('SELECT * FROM customer WHERE (status_code = 0 OR status_code IS NULL) ORDER BY name').all();
+});
+
+// Add customer
+ipcMain.handle('add-customer', async (event, customer) => {
+  const stmt = db.prepare('INSERT INTO customer (name, contact, address, gstin) VALUES (?, ?, ?, ?)');
+  const result = stmt.run(customer.name, customer.contact, customer.address, customer.gstin);
+  return { id: result.lastInsertRowid, ...customer };
+});
+
+// Update customer
+ipcMain.handle('update-customer', async (event, customer) => {
+  const stmt = db.prepare('UPDATE customer SET name = ?, contact = ?, address = ?, gstin = ? WHERE id = ?');
+  const result = stmt.run(customer.name, customer.contact, customer.address, customer.gstin, customer.id);
+  return result.changes > 0;
+});
+
+// Delete customer (soft delete)
+ipcMain.handle('delete-customer', async (event, id) => {
+  const stmt = db.prepare('UPDATE customer SET status_code = 1 WHERE id = ?');
+  const result = stmt.run(id);
+  return result.changes > 0;
+});
+
+
+
+ipcMain.handle('get-app-info', async () => {
+  let pkg = {};
+  try {
+    const data = fs.readFileSync(packageJsonPath, 'utf8');
+    pkg = JSON.parse(data);
+  } catch (err) {
+    console.error('Error reading package.json:', err);
+  }
+
+  return {
+    name: app.getName(),
+    version: app.getVersion(),
+    copyright: app.getCopyright ? app.getCopyright() : (pkg.copyright || ''),
+    productName: pkg.productName || pkg.name || app.getName(),
+    description: pkg.description || '',
+    author: pkg.author || '',
+    company: pkg.company || '',
+    license: 'Shiva Books & Stationers', // Hardcoded license info
+    homepage: pkg.homepageUrl || pkg.homepage || '',
+    repository: pkg.repository?.url || '',
+    bugs: pkg.bugs?.url || '',
+    supportEmail: pkg.support?.email || '',
+    supportPhone: pkg.support?.phone || '',
+    releaseDate: pkg.releaseDate || '',
+    builtWith: pkg.builtWith || [],
+    changelog: pkg.changelog || ''
+  };
 });

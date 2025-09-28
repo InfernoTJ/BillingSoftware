@@ -34,7 +34,7 @@ const Layout = ({ children, user, onLogout }) => {
     { name: 'Purchase Order', href: '/purchase-order', icon: ClipboardList },
     { name: 'Billing', href: '/billing', icon: ReceiptIndianRupee },
     { name: 'Sales History', href: '/sales-history', icon: FileText },
-    { name: 'Ledger', href: '/ledger', icon: BookOpen }, 
+    // { name: 'Ledger', href: '/ledger', icon: BookOpen }, 
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Export', href: '/export', icon: Download }, 
     { name: 'Backup', href: '/backup', icon: Database },
