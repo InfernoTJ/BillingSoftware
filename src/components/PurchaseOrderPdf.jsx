@@ -3,16 +3,13 @@ import companyLogo from "../Assets/logo.png";
 
 const ITEMS_PER_PAGE = 10;
 
-function PurchasePDF({
-  purchaseNumber,
-  supplier,
-  items,
-  discount = 0,
-  subtotal = 0,
-  roundingOff = 0,
-  total = 0,
-  purchaseDate = "",
-  invoiceNumber = ""
+function PurchaseOrderPdf({ 
+  billNumber, 
+  customer, 
+  items, 
+  discount = 0, 
+  subtotal = 0, 
+  total = 0 
 }) {
   // Split items into pages
   const pages = [];
@@ -35,7 +32,7 @@ function PurchasePDF({
         </div>
       </div>
       <div className="text-right space-y-1">
-        <h2 className="text-xl font-bold text-[hsl(214_84%_56%)]">PURCHASE</h2>
+        <h2 className="text-xl font-bold text-[hsl(214_84%_56%)]">PURCHASE ORDER</h2>
         <div className="text-xs text-[hsl(215.4_16.3%_46.9%)] space-y-1">
           <p>Panchaganga Hospital Building</p>
           <p>Shukrawar Peth</p>
@@ -45,39 +42,38 @@ function PurchasePDF({
     </div>
   );
 
-  const PurchaseDetails = () => (
+  const OrderDetails = () => (
     <div className="grid grid-cols-2 gap-6 mb-8">
       <div className="space-y-3">
         <h3 className="text-xs font-semibold text-[hsl(217_19%_35%)] uppercase tracking-wider mb-2">
-          Purchase Details
+          Order Details
         </h3>
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-[hsl(215.4_16.3%_46.9%)]">Purchase No:</span>
-            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{purchaseNumber}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-[hsl(215.4_16.3%_46.9%)]">Invoice No:</span>
-            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{invoiceNumber}</span>
+            <span className="text-[hsl(215.4_16.3%_46.9%)]">Order No:</span>
+            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{billNumber}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-[hsl(215.4_16.3%_46.9%)]">Date:</span>
-            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{purchaseDate}</span>
+            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">
+              {new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </span>
           </div>
         </div>
       </div>
       <div className="space-y-3">
         <h3 className="text-xs font-semibold text-[hsl(217_19%_35%)] uppercase tracking-wider mb-2">
-          Supplier
+          Order To
         </h3>
         <div className="bg-[hsl(220_14%_96%)] p-3 rounded-lg space-y-1">
-          <p className="font-semibold text-[hsl(222.2_84%_4.9%)] text-sm">{supplier.name}</p>
-          <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">{supplier.address}</p>
-          {supplier.gstin && (
-            <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">GSTIN: {supplier.gstin}</p>
-          )}
-          {supplier.contact && (
-            <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">Contact: {supplier.contact}</p>
+          <p className="font-semibold text-[hsl(222.2_84%_4.9%)] text-sm">{customer.name}</p>
+          <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">{customer.address}</p>
+          {customer.gstin && (
+            <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">GSTIN: {customer.gstin}</p>
           )}
         </div>
       </div>
@@ -95,11 +91,9 @@ function PurchasePDF({
             <tr className="bg-[hsl(214_84%_56%)] text-white">
               <th className="text-left py-3 px-4 font-semibold text-xs">Sr No</th>
               <th className="text-left py-3 px-4 font-semibold text-xs">HSN Code</th>
-              <th className="text-left py-3 px-4 font-semibold text-xs">Item</th>
+              {/* <th className="text-left py-3 px-4 font-semibold text-xs">SKU</th> */}
+              <th className="text-left py-3 px-4 font-semibold text-xs">Items</th>
               <th className="text-center py-3 px-4 font-semibold text-xs">Quantity</th>
-              <th className="text-center py-3 px-4 font-semibold text-xs">Rate</th>
-              <th className="text-center py-3 px-4 font-semibold text-xs">GST %</th>
-              <th className="text-center py-3 px-4 font-semibold text-xs">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -114,19 +108,15 @@ function PurchasePDF({
                 >
                   <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">{globalIndex + 1}</td>
                   <td className="py-3 px-4 text-xs font-mono text-[hsl(215.4_16.3%_46.9%)]">{item.hsn_code}</td>
+                  {/* <td className="py-3 px-4 text-xs font-mono text-[hsl(215.4_16.3%_46.9%)]">{item.sku}</td> */}
                   <td className="py-3 px-4 text-xs text-[hsl(222.2_84%_4.9%)] font-medium">{item.name}</td>
                   <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">{item.quantity}</td>
-                  <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">₹{item.unit_price}</td>
-                  <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">{item.gst_percentage}%</td>
-                  <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">₹{item.total_price?.toFixed(2) ?? ((item.unit_price * item.quantity).toFixed(2))}</td>
                 </tr>
               );
             })}
             {/* Fill empty rows to maintain consistent height */}
             {Array.from({ length: ITEMS_PER_PAGE - pageItems.length }, (_, idx) => (
               <tr key={`empty-${idx}`} className="border-b border-[hsl(220_13%_91%)]">
-                <td className="py-3 px-4 text-xs">&nbsp;</td>
-                <td className="py-3 px-4 text-xs">&nbsp;</td>
                 <td className="py-3 px-4 text-xs">&nbsp;</td>
                 <td className="py-3 px-4 text-xs">&nbsp;</td>
                 <td className="py-3 px-4 text-xs">&nbsp;</td>
@@ -140,31 +130,6 @@ function PurchasePDF({
     </div>
   );
 
-  const Totals = () => (
-    <div className="flex justify-end mb-6">
-      <div className="space-y-2 text-right">
-        <div>
-          <span className="font-semibold text-sm">Subtotal:</span>
-          <span className="ml-2 text-sm">₹{subtotal.toFixed(2)}</span>
-        </div>
-        {discount > 0 && (
-          <div>
-            <span className="font-semibold text-green-600 text-sm">Discount ({discount}%):</span>
-            <span className="ml-2 text-green-600 text-sm">-₹{(subtotal * discount / 100).toFixed(2)}</span>
-          </div>
-        )}
-        <div>
-          <span className="font-semibold text-sm">Rounding Off:</span>
-          <span className="ml-2 text-sm">{roundingOff >= 0 ? '+' : ''}₹{roundingOff.toFixed(2)}</span>
-        </div>
-        <div className="border-t pt-2">
-          <span className="font-bold text-base">Total:</span>
-          <span className="ml-2 font-bold text-base">₹{total.toFixed(2)}</span>
-        </div>
-      </div>
-    </div>
-  );
-
   const Footer = () => (
     <div className="border-t border-[hsl(220_13%_91%)] pt-4">
       <div className="text-center space-y-2">
@@ -172,7 +137,7 @@ function PurchasePDF({
           Thank you for your business!
         </p>
         <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">
-          This is a computer-generated purchase and does not require signature.
+          This is a computer-generated order and does not require signature.
         </p>
         <div className="flex justify-center space-x-4 text-xs text-[hsl(215.4_16.3%_46.9%)] mt-3">
           <span>Email: harshank@gmail.com</span>
@@ -186,7 +151,7 @@ function PurchasePDF({
   );
 
   return (
-    <div id="purchase-pdf">
+    <div id="purchase-order-pdf">
       {pages.map((pageItems, pageIndex) => (
         <div
           key={pageIndex}
@@ -203,12 +168,11 @@ function PurchasePDF({
         >
           <div className="flex-1">
             <Header />
-            {pageIndex === 0 && <PurchaseDetails />}
+            {pageIndex === 0 && <OrderDetails />}
             <ItemsTable 
               pageItems={pageItems} 
               isLastPage={pageIndex === pages.length - 1} 
             />
-            {pageIndex === pages.length - 1 && <Totals />}
           </div>
           <Footer />
           {/* Page number */}
@@ -223,4 +187,4 @@ function PurchasePDF({
   );
 }
 
-export default PurchasePDF;
+export default PurchaseOrderPdf;

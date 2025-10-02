@@ -85,8 +85,9 @@ const Layout = ({ children, user, onLogout }) => {
       {/* Desktop sidebar */}
       <nav className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white shadow-lg border-r border-gray-200">
         <div className="flex items-center h-16 px-4 border-b border-gray-200">
-          <img src={svi} className='w-12 h-12 mr-6'  ></img>
-          <h1 className="text-xl font-bold text-gray-900">S V IT HUB</h1>
+          {/* <img src={svi} className='w-12 h-12 mr-6'  ></img>
+          <h1 className="text-xl font-bold text-gray-900">S V IT HUB</h1> */}
+            <h1 className="text-xl font-bold text-gray-900">Billing Software</h1>
            {/* <h1 className="text-xl font-bold text-gray-900">Shiva Books & Stationery</h1> */}
         </div>
         <div className="flex flex-col flex-1 pt-4">
