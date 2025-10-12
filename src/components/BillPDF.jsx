@@ -3,8 +3,9 @@ import companyLogo from "../Assets/logo.png";
 
 const ITEMS_PER_PAGE = 10;
 
-function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roundingOff = 0, total = 0 }) {
+function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roundingOff = 0, total = 0, salesman = '' }) {
   // Split items into pages
+  console.log("Rendering BillPDF with items:", salesman);
   const pages = [];
   for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
     pages.push(items.slice(i, i + ITEMS_PER_PAGE));
@@ -56,6 +57,12 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
               })}
             </span>
           </div>
+          {salesman && (
+            <div className="flex justify-between">
+              <span className="text-[hsl(215.4_16.3%_46.9%)]">Salesman:</span>
+              <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{salesman}</span>
+            </div>
+          )}
         </div>
       </div>
       <div className="space-y-3">
