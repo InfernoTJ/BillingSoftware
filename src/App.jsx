@@ -17,9 +17,10 @@ import Billing from "./components/Billing";
 import SalesHistory from "./components/SalesHistory";
 import Ledger from "./components/Ledger";
 import Export from "./components/Export"; 
-import Backup from "./components/Backup"; 
+import Backup from "./components/Backup";
 import ComingSoon from "./components/ComingSoon";
-import Analytics from "./components/Analytics";
+import Banking from "./components/Banking/index";
+import Analytics from "./components/Analytics"; 
 import Admin from "./components/Admin";
 import ItemDetails from "./components/ItemDetails";
 import PurchaseDetails from "./components/PurchaseDetails";
@@ -28,8 +29,11 @@ import PurchaseOrder from "./components/PurchaseOrder";
 import Layout from "./components/Layout";
 import ShortcutHelp from "./components/ShortcutHelp";
 import PurchaseEdit from "./components/PurchaseEdit";
-import SaleEdit from "./components/SaleEdit";
+import SaleEdit from "./components/SaleEdit"; 
 import Contactus from "./components/Contactus"; 
+import OpeningStockManagement from "./components/Openingstock/OpeningStockManagement"
+import SalesmanCommission from "./components/SalesmanCommission";
+
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
@@ -43,14 +47,16 @@ const App = () => {
   useHotkeys("ctrl+d", () => navigate("/dashboard"), [navigate]);
   useHotkeys("ctrl+i", () => navigate("/inventory"), [navigate]);
   useHotkeys("ctrl+p", () => navigate("/purchase"), [navigate]);
+  useHotkeys("ctrl+o", () => navigate("/purchase-order"), [navigate]);
   useHotkeys("ctrl+b", () => navigate("/billing"), [navigate]);
-  useHotkeys("ctrl+s", () => navigate("/sales-history"), [navigate]);
+  useHotkeys("ctrl+h", () => navigate("/sales-history"), [navigate]);
+  useHotkeys("ctrl+s", () => navigate("/salesman-commission"), [navigate]);
   useHotkeys("ctrl+l", () => navigate("/ledger"), [navigate]);
+  useHotkeys("ctrl+y", () => navigate("/analytics"), [navigate]);
   useHotkeys("ctrl+e", () => navigate("/export"), [navigate]);
-  useHotkeys("ctrl+shift+b", () => navigate("/backup"), [navigate]);
-  useHotkeys("ctrl+shift+a", () => navigate("/admin"), [navigate]);
-  useHotkeys("ctrl+shift+o", () => navigate("/purchase-order"), [navigate]);
-  useHotkeys("ctrl+shift+x", () => navigate("/analytics"), [navigate]);
+  useHotkeys("ctrl+n", () => navigate("/admin"), [navigate]);
+  useHotkeys("ctrl+k", () => navigate("/banking"), [navigate]);
+  
   // useHotkeys("ctrl+t", () => {setShowShortcutHelp(true);
   //  console.log("Shortcut Help Opened");  
   // }, [setShowShortcutHelp]);
@@ -67,13 +73,13 @@ const App = () => {
   const handleLogin = (userData) => {
     setUser(userData);
     setIsAuthenticated(true);
-    localStorage.setItem("user", JSON.stringify(userData));
+    sessionStorage.setItem("user", JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
   };
 
   if (loading) {
@@ -91,28 +97,30 @@ const App = () => {
   return (
     <>
       <Layout user={user} onLogout={handleLogout}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/purchase" element={<Purchase />} />
-          <Route path="/billing" element={<Billing />} />
-          <Route path="/sales-history" element={<SalesHistory />} />
-          <Route path="/ledger" element={<Ledger />} />
-          <Route path="/export" element={<Export />} />
-          <Route path="/backup" element={<Backup />} />  
-          <Route path="/analytics" element={<Analytics />} />  
-           {/* <Route path="/analytics" element={<ComingSoon />} />  */}
-          <Route path="/admin" element={<Admin />} /> 
-          <Route path="/item/:id" element={<ItemDetails />} />
-          <Route path="/purchase/:id" element={<PurchaseDetails />} />
-           <Route path="/purchaseupdate/:id" element={<PurchaseEdit />} />
-          <Route path="/sale/:id" element={<SaleDetails />} />
-          <Route path="/saleedit/:id" element={<SaleEdit />} />
-          <Route path="/purchase-order" element={<PurchaseOrder />} />
-          <Route path="/contact" element={<Contactus />} />
-        </Routes> 
-      </Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/purchase" element={<Purchase />} />
+                <Route path="/billing" element={<Billing />} />
+                <Route path="/sales-history" element={<SalesHistory />} />
+                <Route path="/salesman-commission" element={<SalesmanCommission />} />
+                <Route path="/ledger" element={<Ledger />} />
+                <Route path="/export" element={<Export />} />
+                <Route path="/backup" element={<Backup />} />  
+                <Route path="/analytics" element={<Analytics />} />  
+                 <Route path="/banking" element={<Banking />} /> 
+                 <Route path="/openingstock" element={<OpeningStockManagement />} /> 
+                <Route path="/admin" element={<Admin />} /> 
+                <Route path="/item/:id" element={<ItemDetails />} />
+                <Route path="/purchase/:id" element={<PurchaseDetails />} />
+                 <Route path="/purchaseupdate/:id" element={<PurchaseEdit />} />
+                <Route path="/sale/:id" element={<SaleDetails />} />
+                <Route path="/saleedit/:id" element={<SaleEdit />} />
+                <Route path="/purchase-order" element={<PurchaseOrder />} />
+                <Route path="/contact" element={<Contactus />} />
+              </Routes> 
+            </Layout>
 
       {showShortcutHelp && (
         <ShortcutHelp onClose={() => setShowShortcutHelp(false)} />

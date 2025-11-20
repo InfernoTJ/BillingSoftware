@@ -55,6 +55,8 @@ const Admin = () => {
     mrp: '',
     purchase_rate: '',
     sale_rate: '',
+    customer_rate: '',
+    salesman_rate: '',
     gst_percentage: '',
     category_id: '',
     current_stock: '',
@@ -117,9 +119,9 @@ const Admin = () => {
   const validateUnitForm = (form) => {
     const errors = {};
     if (!form.name || String(form.name).trim().length < 1) errors.name = 'Unit name is required';
-    return errors;
+    return errors; 
   };
-
+ 
   const validateGstForm = (form) => {
     const errors = {};
     if (form.rate === '' || form.rate === null || isNaN(form.rate)) errors.rate = 'GST rate is required';
@@ -135,14 +137,20 @@ const Admin = () => {
     if (isEmpty(form.unit)) errors.unit = 'Unit is required';
     if (isEmpty(form.category_id)) errors.category_id = 'Category is required';
 
-    const mrp = parseFloat(form.mrp);
-    if (isNaN(mrp) || mrp <= 0) errors.mrp = 'MRP must be greater than 0';
+    // const mrp = parseFloat(form.mrp);
+    // if (isNaN(mrp) || mrp <= 0) errors.mrp = 'MRP must be greater than 0';
 
     const pr = parseFloat(form.purchase_rate);
     if (isNaN(pr) || pr <= 0) errors.purchase_rate = 'Purchase rate must be greater than 0';
 
-    const sr = parseFloat(form.sale_rate);
-    if (isNaN(sr) || sr <= 0) errors.sale_rate = 'Sale rate must be greater than 0';
+    // const sr = parseFloat(form.sale_rate);
+    // if (isNaN(sr) || sr <= 0) errors.sale_rate = 'Sale rate must be greater than 0';
+
+    const cr = parseFloat(form.customer_rate); 
+    if (isNaN(cr) || cr < 0) errors.customer_rate = 'Customer rate must be 0 or more';
+
+    const smr = parseFloat(form.salesman_rate);
+    if (isNaN(smr) || smr < 0) errors.salesman_rate = 'Salesman rate must be 0 or more';
 
     if (isEmpty(form.gst_percentage) && form.gst_percentage !== 0) {
       errors.gst_percentage = 'GST rate is required';
@@ -166,20 +174,22 @@ const Admin = () => {
     return errors;
   };
 
-  const buildProductPayload = (form) => ({
-    name: String(form.name).trim(),
-    sku: String(form.sku).trim(),
-    hsn_code: String(form.hsn_code || '').trim(),
-    description: String(form.description || '').trim(),
-    unit: String(form.unit),
-    mrp: Math.max(0, parseFloat(form.mrp) || 0),
-    purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
-    sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
-    gst_percentage: parseFloat(form.gst_percentage) || 0,
-    category_id: parseInt(form.category_id, 10),
-    current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
-    minimum_stock: Math.max(0, parseInt(form.minimum_stock, 10) || 0)
-  });
+const buildProductPayload = (form) => ({
+  name: String(form.name).trim(),
+  sku: String(form.sku).trim() || getNextSku(), // Fallback to auto-generated if empty
+  hsn_code: String(form.hsn_code || '').trim(),
+  description: String(form.description || '').trim(),
+  unit: String(form.unit),
+  mrp: Math.max(0, parseFloat(form.mrp) || 0),
+  purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
+  sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
+  customer_rate: Math.max(0, parseFloat(form.customer_rate) || 0),
+  salesman_rate: Math.max(0, parseFloat(form.salesman_rate) || 0),
+  gst_percentage: parseFloat(form.gst_percentage) || 0,
+  category_id: parseInt(form.category_id, 10),
+  current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
+  minimum_stock: Math.max(0, parseInt(form.minimum_stock, 10) || 0)
+});
 
 
 
@@ -237,14 +247,19 @@ const Admin = () => {
         const payload = buildProductPayload(productForm);
         const newProduct = await window.electronAPI.addItem(payload);
 
-        // --- Update closing stock after adding product ---
-        await window.electronAPI.updateClosingStock({
-          itemId: newProduct.id,
-          qty: payload.current_stock,
-          purchaseRate: payload.purchase_rate
-        });
+        // --- NEW: Set opening stock when adding product ---
+        if (payload.current_stock > 0) {
+          await window.electronAPI.setOpeningStock({
+            itemId: newProduct.id,
+            qty: payload.current_stock,
+            rate: payload.purchase_rate,
+            date: new Date().toISOString().split('T')[0]
+          });
+          toast.success('Product added with opening stock');
+        } else {
+          toast.success('Product added successfully');
+        }
 
-        toast.success('Product added successfully');
         setProducts([...products, newProduct]);
       }
       setShowProductForm(false);
@@ -254,6 +269,8 @@ const Admin = () => {
       if (error?.message?.includes('SKU already exists')) {
         setProductErrors({ ...productErrors, sku: 'SKU already exists' });
         toast.error('SKU already exists');
+      } else if (error?.message?.includes('locked')) {
+        toast.error('Opening stock is locked and cannot be modified');
       } else {
         toast.error('Error adding product');
         console.error('Error adding product:', error);
@@ -275,17 +292,46 @@ const Admin = () => {
           toast.error('SKU already exists');
           return;
         }
+
+        // Get existing item data
+        const existingItem = products.find(p => p.id === editingItem);
         const payload = { id: editingItem, ...buildProductPayload(productForm) };
+        
         await window.electronAPI.updateItem(payload);
 
-        // --- Update closing stock after editing product ---
-        await window.electronAPI.updateClosingStock({
-          itemId: editingItem,
-          qty: payload.current_stock,
-          purchaseRate: payload.purchase_rate
-        });
+        // --- NEW: Update opening stock ONLY if it's not locked ---
+        try {
+          const openingStock = await window.electronAPI.getOpeningStock(editingItem);
+          
+          if (openingStock.is_locked === 1) {
+            toast.warning('Opening stock is locked. Only item details updated.');
+          } else {
+            // Calculate the difference between old and new stock
+            const oldQty = existingItem.current_stock || 0;
+            const newQty = payload.current_stock || 0;
+            const qtyDifference = newQty - oldQty;
 
-        toast.success('Product updated successfully');
+            // Calculate the new opening stock quantity
+            const currentOpeningQty = openingStock.opening_qty || 0;
+            const updatedOpeningQty = currentOpeningQty + qtyDifference;
+
+            if (updatedOpeningQty >= 0) {
+              await window.electronAPI.setOpeningStock({
+                itemId: editingItem,
+                qty: updatedOpeningQty,
+                rate: payload.purchase_rate,
+                date: openingStock.opening_date || new Date().toISOString().split('T')[0]
+              });
+              toast.success('Product and opening stock updated');
+            } else {
+              toast.warning('Opening stock cannot be negative. Only item details updated.');
+            }
+          }
+        } catch (stockError) {
+          console.error('Error updating opening stock:', stockError);
+          toast.warning('Product updated but opening stock update failed');
+        }
+
         await loadAllData();
       }
       setEditingItem(null);
@@ -636,6 +682,23 @@ const Admin = () => {
     { id: 'customers', name: 'Customers', icon: Users } // NEW: Customers tab
   ];
 
+  useEffect(() => {
+    // Auto-generate SKU when product form is opened for new product
+    if (showProductForm && !editingItem) {
+      const generateSku = async () => {
+        try {
+          const nextSku = await window.electronAPI.getNextSku();
+          setProductForm(prev => ({ ...prev, sku: nextSku }));
+        } catch (error) {
+          console.error('Error generating SKU:', error);
+        }
+      };
+      generateSku();
+    }
+  }, [showProductForm, editingItem]);
+
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -733,8 +796,9 @@ const Admin = () => {
                   <h2 className="text-lg font-semibold">Product Management</h2>
                   <button
                     onClick={() => {
-                      setProductForm(initialProductForm); // <-- Reset product form
+                      setProductForm(initialProductForm);
                       setShowProductForm(true);
+                      // Auto-generate SKU will be handled by useEffect
                     }}
                     className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                   >
@@ -749,9 +813,11 @@ const Admin = () => {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MRP</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Rate</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST%</th>
+                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MRP</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Rate</th> */}
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Rate</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman Rate</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST%</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                       </tr>
@@ -772,13 +838,19 @@ const Admin = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {product.sku}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               ₹{product.mrp}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               ₹{product.sale_rate}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            </td> */}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ₹{product.customer_rate}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ₹{product.salesman_rate}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {product.gst_percentage}%
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -829,13 +901,13 @@ const Admin = () => {
                       onChange={e => setSupplierFilters({ ...supplierFilters, contact: e.target.value })}
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     />
-                    <input
+                    {/* <input
                       type="text"
                       placeholder="GSTIN"
                       value={supplierFilters.gstin}
                       onChange={e => setSupplierFilters({ ...supplierFilters, gstin: e.target.value })}
                       className="px-3 py-2 border border-gray-300 rounded-lg"
-                    />
+                    /> */}
                   </div>
                   <div className="flex mt-2">
                     <button
@@ -1078,7 +1150,7 @@ const Admin = () => {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200"> 
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
@@ -1252,20 +1324,43 @@ const Admin = () => {
                   {productErrors.name && <p className="text-red-600 text-xs mt-1">{productErrors.name}</p>}
                 </div>
 
-                {/* SKU */}
+                {/* SKU - Updated with auto-generation */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SKU</label>
-                  <input
-                    type="text"
-                    value={productForm.sku}
-                    onChange={(e) => {
-                      const upper = e.target.value.toUpperCase();
-                      setProductForm({ ...productForm, sku: upper });
-                      if (productErrors.sku) setProductErrors({ ...productErrors, sku: undefined });
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.sku ? 'border-red-500' : 'border-gray-300'
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SKU
+                    <span className="text-xs text-gray-500 ml-1">(Auto-generated or custom)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={productForm.sku}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        setProductForm({ ...productForm, sku: value });
+                        if (productErrors.sku) setProductErrors({ ...productErrors, sku: undefined });
+                      }}
+                      className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        productErrors.sku ? 'border-red-500' : 'border-gray-300'
                       }`}
-                  />
+                      placeholder="Auto-generated or enter custom"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const nextSku = await window.electronAPI.getNextSku();
+                          setProductForm({ ...productForm, sku: nextSku });
+                          if (productErrors.sku) setProductErrors({ ...productErrors, sku: undefined });
+                        } catch (error) {
+                          console.error('Error generating SKU:', error);
+                        }
+                      }}
+                      className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                      title="Generate next SKU"
+                    >
+                      Auto
+                    </button>
+                  </div>
                   {productErrors.sku && <p className="text-red-600 text-xs mt-1">{productErrors.sku}</p>}
                 </div>
 
@@ -1370,24 +1465,65 @@ const Admin = () => {
                   {productErrors.purchase_rate && <p className="text-red-600 text-xs mt-1">{productErrors.purchase_rate}</p>}
                 </div>
 
-                {/* Sale Rate (required) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sale Rate</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    onWheel={e => e.target.blur()}
-                    value={productForm.sale_rate}
-                    onChange={(e) => {
-                      setProductForm({ ...productForm, sale_rate: e.target.value });
-                      if (productErrors.sale_rate) setProductErrors({ ...productErrors, sale_rate: undefined });
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.sale_rate ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    min={0}
-                  />
-                  {productErrors.sale_rate && <p className="text-red-600 text-xs mt-1">{productErrors.sale_rate}</p>}
-                </div>
+              {/* Sale Rate (required) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sale Rate</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  onWheel={e => e.target.blur()}
+                  value={productForm.sale_rate}
+                  onChange={(e) => {
+                    setProductForm({ ...productForm, sale_rate: e.target.value });
+                    if (productErrors.sale_rate) setProductErrors({ ...productErrors, sale_rate: undefined });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    productErrors.sale_rate ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min={0}
+                />
+                {productErrors.sale_rate && <p className="text-red-600 text-xs mt-1">{productErrors.sale_rate}</p>}
+              </div>
+
+              {/* Customer Rate */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Customer Rate</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  onWheel={e => e.target.blur()}
+                  value={productForm.customer_rate}
+                  onChange={(e) => {
+                    setProductForm({ ...productForm, customer_rate: e.target.value });
+                    if (productErrors.customer_rate) setProductErrors({ ...productErrors, customer_rate: undefined });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    productErrors.customer_rate ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min={0}
+                />
+                {productErrors.customer_rate && <p className="text-red-600 text-xs mt-1">{productErrors.customer_rate}</p>}
+              </div>
+
+              {/* Salesman Rate */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Salesman Rate</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  onWheel={e => e.target.blur()}
+                  value={productForm.salesman_rate}
+                  onChange={(e) => {
+                    setProductForm({ ...productForm, salesman_rate: e.target.value });
+                    if (productErrors.salesman_rate) setProductErrors({ ...productErrors, salesman_rate: undefined });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    productErrors.salesman_rate ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min={0}
+                />
+                {productErrors.salesman_rate && <p className="text-red-600 text-xs mt-1">{productErrors.salesman_rate}</p>}
+              </div>
 
                 {/* GST % (required) */}
                 <div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Package, User, Calendar, DollarSign, FileText, Phone, MapPin, Plus, Trash2, Save, Lock } from 'lucide-react';
+import { ArrowLeft, Package, User, Calendar, DollarSign, FileText, Phone, MapPin, Plus, Trash2, Save, Lock, RotateCcw } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 // --- PIN Modal (same as in Backup.jsx) ---
@@ -46,10 +46,6 @@ const SaleEdit = () => {
   const [salesmen, setSalesmen] = useState([]);
   const [selectedSalesman, setSelectedSalesman] = useState('');
 
-  // --- PIN protection state ---
-
-
-
   // Editable fields
   const [form, setForm] = useState({
     bill_number: '',
@@ -62,6 +58,10 @@ const SaleEdit = () => {
     items: []
   });
 
+  // --- New states for salesman/customer logic ---
+  const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
+  const [isOthers, setIsOthers] = useState(false);
+
   useEffect(() => {
     loadSaleDetails();
     window.electronAPI.getInventory().then(setItems);
@@ -70,47 +70,56 @@ const SaleEdit = () => {
     // eslint-disable-next-line
   }, [id]);
 
-  const loadSaleDetails = async () => {
-    setLoading(true);
-    try {
-      const result = await window.electronAPI.getSaleDetails(parseInt(id));
-      console.log(result)
-      setSale(result); 
-      setForm({
-        bill_number: result.bill_number,
-        customer_name: result.customer_name || '',
-        customer_contact: result.customer_contact || '',
-        customer_address: result.customer_address || '',
-        customer_gstin: result.customer_gstin || '',
-        sale_date: result.sale_date,
-        discount: result.discount || 0,
-        items: result.items.map(item => ({
-          id: item.item_id,
-          name: item.item_name,
-          hsn_code: item.hsn_code,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          total_price: item.total_price
-        }))
-      });
-      setSelectedSalesman(result.salesman_id || '');
-    } catch (error) {
-      toast.error('Error loading sale details');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadSaleDetails = async () => { 
+  setLoading(true);
+  try {
+    const result = await window.electronAPI.getSaleDetails(parseInt(id));
+    console.log('Fetched sale details:', result);  
+    setSale(result); 
+    setForm({
+      bill_number: result.bill_number,
+      customer_name: result.customer_name || '',
+      customer_contact: result.customer_contact || '',
+      customer_address: result.customer_address || '',
+      customer_gstin: result.customer_gstin || '',
+      sale_date: result.sale_date,
+      discount: result.discount || 0,
+      items: result.items.map(item => ({
+        id: item.item_id,
+        name: item.item_name,
+        hsn_code: item.hsn_code,
+        quantity: item.quantity,
+        unit_price: item.unit_price, // Keep the actual saved price
+        total_price: item.total_price,
+        // Store the original rates for reset functionality
+        original_customer_rate: item.customer_rate,
+        original_salesman_rate: item.salesman_rate,
+        // Store the actual saved price as well
+        saved_unit_price: item.unit_price
+      }))
+    });
+    setSelectedSalesman(result.salesman_id || '');
+
+    // Reflect sale_type in checkboxes
+    setIsSalesmanCustomer(result.sale_type === 'salesman');
+    setIsOthers(result.sale_type === 'others');
+  } catch (error) {
+    toast.error('Error loading sale details');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Item dropdown logic (for adding new items)
-  const [itemSearch, setItemSearch] = useState('');
+  const [itemSearch, setItemSearch] = useState(''); 
   const [showItemList, setShowItemList] = useState(false);
   const [itemDropdownIndex, setItemDropdownIndex] = useState(0);
   const itemInputRef = useRef();
  
-const filteredItems = items.filter(i =>
-  i.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
-  (i.sku && i.sku.toLowerCase().includes(itemSearch.toLowerCase()))
-);
+  const filteredItems = items.filter(i =>
+    i.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+    (i.sku && i.sku.toLowerCase().includes(itemSearch.toLowerCase()))
+  );
 
   const handleItemInputKeyDown = (e) => {
     if (showItemList && filteredItems.length > 0) {
@@ -124,57 +133,91 @@ const filteredItems = items.filter(i =>
       }
     }
   };
-const addItemToSale = (item) => {
-  if (!item) return;
-  if (form.items.some(i => i.id === item.id)) {
-    toast.warn('Item already in sale');
+
+  const addItemToSale = (item) => {
+    if (!item) return;
+    if (form.items.some(i => i.id === item.id)) {
+      toast.warn('Item already in sale');
+      setShowItemList(false);
+      setItemSearch('');
+      return;
+    }
+    // Determine rate based on checkbox logic
+    let rate = item.customer_rate;
+    if (isOthers || isSalesmanCustomer) {
+      rate = item.salesman_rate;
+    }
+    setForm(f => ({
+      ...f,
+      items: [
+        ...f.items,
+        {
+          id: item.id,
+          name: item.name,
+          hsn_code: item.hsn_code,
+          quantity: '',
+          unit_price: rate,
+          total_price: 0,
+          original_customer_rate: item.customer_rate,
+          original_salesman_rate: item.salesman_rate
+        }
+      ]
+    }));
     setShowItemList(false);
     setItemSearch('');
-    return;
-  }
-  setForm(f => ({
-    ...f,
-    items: [
-      ...f.items,
-      {
-        id: item.id,
-        name: item.name,
-        hsn_code: item.hsn_code,
-        quantity: 1, // Default quantity
-        unit_price: item.mrp || item.sale_rate || 0, // Use MRP or sale_rate as default
-        total_price: item.mrp || item.sale_rate || 0 // Initial total
-      }
-    ]
-  }));
-  setShowItemList(false);
-  setItemSearch('');
-  setItemDropdownIndex(0);
-  setTimeout(() => {
-    document.getElementById(`qty-input-${form.items.length}`)?.focus();
-  }, 0);
-};
+    setItemDropdownIndex(0);
+    setTimeout(() => {
+      document.getElementById(`qty-input-${form.items.length}`)?.focus();
+    }, 0);
+  };
 
-const updateSaleItem = (idx, field, value) => {
-  setForm(f => {
-    const items = [...f.items];
-    items[idx][field] = value;
-    
-    // Recalculate total_price when quantity or unit_price changes
-    if (field === 'quantity' || field === 'unit_price') {
-      const qty = parseFloat(items[idx].quantity) || 0;
-      const rate = parseFloat(items[idx].unit_price) || 0;
-      items[idx].total_price = qty * rate;
-    }
-    
-    return { ...f, items };
-  });
-};
+  const updateSaleItem = (idx, field, value) => {
+    setForm(f => {
+      const items = [...f.items];
+      items[idx][field] = value;
+      
+      // Recalculate total_price when quantity or unit_price changes
+      if (field === 'quantity' || field === 'unit_price') {
+        const qty = parseFloat(items[idx].quantity) || 0;
+        const rate = parseFloat(items[idx].unit_price) || 0;
+        items[idx].total_price = qty * rate;
+      }
+      
+      return { ...f, items };
+    });
+  };
 
   const removeSaleItem = (idx) => {
     setForm(f => ({
       ...f,
       items: f.items.filter((_, i) => i !== idx)
     }));
+  };
+
+  // Reset price to original rate based on sale type
+  const resetPriceToOriginal = (idx) => {
+    setForm(f => {
+      const items = [...f.items];
+      const item = items[idx];
+      
+      // Determine which rate to use based on current sale type
+      let originalRate;
+      if (isOthers || isSalesmanCustomer) {
+        originalRate = item.original_salesman_rate;
+      } else {
+        originalRate = item.original_customer_rate;
+      }
+      
+      if (originalRate) {
+        items[idx].unit_price = originalRate;
+        items[idx].total_price = (parseFloat(items[idx].quantity) || 0) * originalRate;
+        toast.success(`Price reset to original ${isOthers || isSalesmanCustomer ? 'salesman' : 'customer'} rate`);
+      } else {
+        toast.error('Original rate not found');
+      }
+      
+      return { ...f, items };
+    });
   };
 
   // Calculate subtotal
@@ -192,6 +235,47 @@ const updateSaleItem = (idx, field, value) => {
 
   // Final total
   const getFinalAmount = () => Math.round(getAmountBeforeRounding());
+
+  // --- Update item rate logic when checkboxes change ---
+  useEffect(() => {
+    // Only update rates if the sale has been loaded and user is actively changing checkboxes
+    if (!sale) return; 
+    
+    setForm(f => ({
+      ...f,
+      items: f.items.map(item => {
+        // Check if the current unit_price matches any of the original rates
+        const isUsingOriginalCustomerRate = item.unit_price === item.original_customer_rate;
+        const isUsingOriginalSalesmanRate = item.unit_price === item.original_salesman_rate;
+        
+        // Only change the rate if it's currently using one of the original rates
+        // This preserves custom/edited prices
+        if (isUsingOriginalCustomerRate || isUsingOriginalSalesmanRate) {
+          const rate = isOthers || isSalesmanCustomer 
+            ? item.original_salesman_rate 
+            : item.original_customer_rate;
+          
+          return { 
+            ...item, 
+            unit_price: rate || item.unit_price, 
+            total_price: (parseFloat(item.quantity) || 0) * (rate || item.unit_price)
+          };
+        }
+        
+        // Keep the current custom price if it doesn't match original rates
+        return item;
+      })
+    }));
+  }, [isSalesmanCustomer, isOthers, sale]); // Add 'sale' as dependency
+
+  // --- Auto-select salesman to SELF when Others is checked ---
+  useEffect(() => {
+    if (isOthers) {
+      const selfSalesman = salesmen.find(s => s.name?.toLowerCase() === 'self');
+      if (selfSalesman) setSelectedSalesman(selfSalesman.id);
+      setIsSalesmanCustomer(false);
+    }
+  }, [isOthers, salesmen]);
 
   const handleSave = async () => {
     // Validate
@@ -212,13 +296,32 @@ const updateSaleItem = (idx, field, value) => {
       toast.error('Please enter at least one valid item');
       return;
     }
+ 
+    // --- STOCK VALIDATION ---
+    for (const item of validItems) {
+      const stockItem = items.find(i => i.id === item.id);
+      // Find the original quantity from the loaded sale
+      const originalSaleItem = sale?.items?.find(si => si.item_id === item.id);
+      const originalQty = originalSaleItem ? parseInt(originalSaleItem.quantity) : 0;
+      const maxAllowedQty = (stockItem?.current_stock || 0) + originalQty;
+
+      if (parseInt(item.quantity) > maxAllowedQty) {
+        toast.error(
+          `Insufficient stock for ${item.name}. Available for sale: ${maxAllowedQty} (Current stock: ${stockItem?.current_stock || 0}, Previously sold: ${originalQty})`
+        );
+        return;
+      } 
+    }
+    // --- END STOCK VALIDATION ---
+
     try {
       await window.electronAPI.updateSale(parseInt(id), {
-        ...form,
-        items: validItems,
+        ...form, 
+        items: form.items,
         total_amount: getFinalAmount(),
         rounding_off: getRoundingOff(),
-        salesman_id: selectedSalesman || null // <-- add salesman_id
+        salesman_id: selectedSalesman || null,
+        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer') 
       });
       toast.success('Sale updated successfully!');
       navigate('/sales-history');
@@ -226,9 +329,6 @@ const updateSaleItem = (idx, field, value) => {
       toast.error('Error updating sale');
     }
   };
-
-  // --- PIN protection UI ---
-
 
   if (loading) {
     return (
@@ -325,12 +425,41 @@ const updateSaleItem = (idx, field, value) => {
                 value={selectedSalesman}
                 onChange={e => setSelectedSalesman(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isOthers}
               >
                 <option value="">Select Salesman</option>
                 {salesmen.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
+            </div>
+            {/* --- UI for checkboxes --- */}
+            <div className="flex items-center mt-2 space-x-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isSalesmanCustomer}
+                  onChange={e => setIsSalesmanCustomer(e.target.checked)}
+                  id="isSalesmanCustomer"
+                  className="mr-2 w-5 h-5 accent-blue-600"
+                  disabled={isOthers}
+                />
+                <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
+                  Is Salesman
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isOthers}
+                  onChange={e => setIsOthers(e.target.checked)}
+                  id="isOthers"
+                  className="mr-2 w-5 h-5 accent-blue-600"
+                />
+                <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
+                  Others
+                </label>
+              </div>
             </div>
           </div>
 
@@ -363,7 +492,10 @@ const updateSaleItem = (idx, field, value) => {
                       onMouseDown={() => addItemToSale(itm)}
                       tabIndex={-1}
                     >
-                      {itm.name}
+                      {itm.name} 
+                      <span className="text-xs text-gray-500 ml-2">
+                        (Customer: ₹{itm.customer_rate}, Salesman: ₹{itm.salesman_rate})
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -386,7 +518,6 @@ const updateSaleItem = (idx, field, value) => {
               </thead>
               <tbody>
                 {form.items.map((item, idx) => {
-                  // Only allow changing quantity, not rate
                   return (
                     <tr key={idx} className="border-b">
                       <td className="px-4 py-2">{item.name}</td>
@@ -415,17 +546,16 @@ const updateSaleItem = (idx, field, value) => {
                             placeholder="₹0.00"
                           />
                           <button
-                            onClick={() => {
-                              const originalItem = items.find(i => i.id === item.id);
-                              if (originalItem) {
-                                updateSaleItem(idx, 'unit_price', originalItem.mrp || originalItem.sale_rate || 0);
-                              }
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                            title="Reset to MRP"
+                            onClick={() => resetPriceToOriginal(idx)}
+                            className="flex items-center text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors"
+                            title={`Reset to original ${isOthers || isSalesmanCustomer ? 'salesman' : 'customer'} rate`}
                           >
+                            <RotateCcw className="w-3 h-3 mr-1" />
                             Reset
                           </button>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Customer: ₹{item.original_customer_rate || 0} | Salesman: ₹{item.original_salesman_rate || 0}
                         </div>
                       </td>
                       <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
@@ -487,7 +617,7 @@ const updateSaleItem = (idx, field, value) => {
         </div>
       </div>
     </PinProtected>
-  );
+  ); 
 };
 
 export default SaleEdit;
