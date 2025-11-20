@@ -86,6 +86,7 @@ const Billing = () => {
   const loadItems = async () => {
     try {
       const data = await window.electronAPI.getInventory();
+      console.log('Inventory data loaded:', data);
       setItems(data);
 
       // Update cart items with latest stock info if cart was loaded from session
@@ -174,7 +175,7 @@ const Billing = () => {
 
   // --- Add to cart with proper rate selection ---
   const addToCart = (item) => {
-    const rate = isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
+    const rate = item.mrp; 
 
     const existingIndex = cart.findIndex(cartItem => cartItem.id === item.id);
     if (existingIndex !== -1) {
@@ -210,26 +211,7 @@ const Billing = () => {
     }
   };
 
-  // --- Update cart rates when checkboxes change ---
-  useEffect(() => {
-    setCart(cart =>
-      cart.map(cartItem => {
-        const item = items.find(i => i.id === cartItem.id);
-        if (!item) return cartItem;
-        const rate = isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
-        return { ...cartItem, unit_price: rate };
-      })
-    );
-  }, [isSalesmanCustomer, isOthers, items]);
-
-  // --- Auto-select salesman when Others is checked ---
-  useEffect(() => {
-    if (isOthers) {
-      const selfSalesman = salesmen.find(s => s.name?.toLowerCase() === 'self');
-      if (selfSalesman) setSelectedSalesman(selfSalesman.id);
-      setIsSalesmanCustomer(false);
-    }
-  }, [isOthers, salesmen]);
+ 
 
   // --- Cart keyboard controls ---
   const handleCartKeyDown = (e, idx, itemId) => {
@@ -584,7 +566,7 @@ const Billing = () => {
                     >
                       {item.name}
                       <span className="text-xs text-gray-400 ml-2">
-                        (Stock: {item.current_stock}, Rate: ₹{isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate})
+                        (Stock: {item.current_stock}, Rate: ₹{item.mrp})
                       </span>
                     </li>
                   ))}
@@ -701,33 +683,7 @@ const Billing = () => {
               </div>
             </div>
 
-            <div className="flex items-center mt-6 space-x-6">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={isSalesmanCustomer}
-                  onChange={e => setIsSalesmanCustomer(e.target.checked)}
-                  id="isSalesmanCustomer"
-                  className="mr-2 w-5 h-5"
-                  disabled={isOthers}
-                />
-                <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
-                  Is Salesman
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={isOthers}
-                  onChange={e => setIsOthers(e.target.checked)}
-                  id="isOthers"
-                  className="mr-2 w-5 h-5"
-                />
-                <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
-                  Others
-                </label>
-              </div>
-            </div>
+          
             
           </div>
 

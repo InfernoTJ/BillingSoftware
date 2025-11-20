@@ -69,7 +69,6 @@ const channelGroups = {
     getSalesHistory: 'get-sales-history',
     getSalePaymentForApproval: 'get-sale-payment-for-approval',
     getApprovalHistory: 'get-approval-history',
-    getSalesmanCommission: 'get-Salesman-Commission'
   },
   transactions: {
     getTransactions: 'get-transactions',

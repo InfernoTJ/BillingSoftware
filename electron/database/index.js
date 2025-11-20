@@ -40,8 +40,6 @@ export function initDatabase(dbPath) {
     mrp REAL DEFAULT 0,
     purchase_rate REAL DEFAULT 0,
     sale_rate REAL DEFAULT 0,
-    customer_rate REAL DEFAULT 0,
-    salesman_rate REAL DEFAULT 0,
     gst_percentage REAL DEFAULT 0,
     category_id INTEGER DEFAULT NULL,
     current_stock INTEGER DEFAULT 0,
@@ -121,8 +119,6 @@ export function initDatabase(dbPath) {
     sgst_amount REAL NOT NULL DEFAULT 0,
     total_price REAL NOT NULL,
     sale_type TEXT DEFAULT 'customer',
-    customer_rate REAL DEFAULT 0,
-    salesman_rate REAL DEFAULT 0,
     status_code INTEGER DEFAULT 0,
     FOREIGN KEY (sale_id) REFERENCES sales (id),
     FOREIGN KEY (item_id) REFERENCES items (id)

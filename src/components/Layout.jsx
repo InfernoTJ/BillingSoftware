@@ -44,7 +44,6 @@ const Layout = ({ children, user, onLogout }) => {
     { name: 'Purchase Order', href: '/purchase-order', icon: ClipboardList },
     { name: 'Billing', href: '/billing', icon: ReceiptIndianRupee },
     { name: 'Sales History', href: '/sales-history', icon: FileText },
-    { name: 'Salesman Commission', href: '/salesman-commission', icon: BadgeIndianRupee },
     { name: 'Ledger', href: '/ledger', icon: BookOpen }, 
     { name: 'Banking', href: '/banking', icon: IndianRupee }, 
     { name: 'Analytics', href: '/analytics', icon: BarChart3 }, 

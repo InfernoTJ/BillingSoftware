@@ -26,15 +26,14 @@ import ItemDetails from "./components/ItemDetails";
 import PurchaseDetails from "./components/PurchaseDetails";
 import SaleDetails from "./components/SaleDetails";
 import PurchaseOrder from "./components/PurchaseOrder";
-import Layout from "./components/Layout";
+import Layout from "./components/Layout"; 
 import ShortcutHelp from "./components/ShortcutHelp";
 import PurchaseEdit from "./components/PurchaseEdit";
 import SaleEdit from "./components/SaleEdit"; 
 import Contactus from "./components/Contactus"; 
 import OpeningStockManagement from "./components/Openingstock/OpeningStockManagement"
-import SalesmanCommission from "./components/SalesmanCommission";
 import Company from "./components/Company";
-
+ 
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
@@ -51,7 +50,6 @@ const App = () => {
   useHotkeys("ctrl+o", () => navigate("/purchase-order"), [navigate]);
   useHotkeys("ctrl+b", () => navigate("/billing"), [navigate]);
   useHotkeys("ctrl+h", () => navigate("/sales-history"), [navigate]);
-  useHotkeys("ctrl+s", () => navigate("/salesman-commission"), [navigate]);
   useHotkeys("ctrl+l", () => navigate("/ledger"), [navigate]);
   useHotkeys("ctrl+u", () => navigate("/company"), [navigate]);
   useHotkeys("ctrl+y", () => navigate("/analytics"), [navigate]);
@@ -107,8 +105,7 @@ const App = () => {
                 <Route path="/purchase" element={<Purchase />} />
                 <Route path="/billing" element={<Billing />} />
                 <Route path="/sales-history" element={<SalesHistory />} />
-                <Route path="/salesman-commission" element={<SalesmanCommission />} />
-                <Route path="/ledger" element={<Ledger />} />
+                 <Route path="/ledger" element={<Ledger />} />
                 <Route path="/export" element={<Export />} />
                 <Route path="/backup" element={<Backup />} />  
                 <Route path="/analytics" element={<Analytics />} />  

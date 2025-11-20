@@ -816,7 +816,7 @@ const SalesHistory = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {sale.sale_type === "salesman" ? sale.salesman: (sale.customer_name || ' ')} 
+                        {sale.customer_name} 
                       </div>
                       {sale.customer_contact && (
                         <div className="text-sm text-gray-500">{sale.customer_contact}</div>
@@ -830,7 +830,7 @@ const SalesHistory = () => {
                     {sale.item_count} items
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {sale.sale_type === "salesman" ? <Minus />: sale.salesman}  
+                    {sale.salesman} 
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     ₹{sale.total_amount.toLocaleString()}

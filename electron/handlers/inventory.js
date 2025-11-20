@@ -93,7 +93,7 @@ export function registerInventoryHandlers({ ipcMain, getDb }) {
 
       const stmt = getDb().prepare(`
         INSERT INTO items
-          (name, sku, hsn_code, description, unit, mrp, purchase_rate, sale_rate, customer_rate, salesman_rate, gst_percentage, category_id, current_stock, minimum_stock)
+          (name, sku, hsn_code, description, unit, mrp, purchase_rate, sale_rate, gst_percentage, category_id, current_stock, minimum_stock)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
@@ -106,8 +106,6 @@ export function registerInventoryHandlers({ ipcMain, getDb }) {
         itemData.mrp,
         itemData.purchase_rate,
         itemData.sale_rate,
-        itemData.customer_rate,
-        itemData.salesman_rate,
         itemData.gst_percentage,
         itemData.category_id,
         itemData.current_stock,
@@ -132,7 +130,7 @@ export function registerInventoryHandlers({ ipcMain, getDb }) {
 
       const stmt = getDb().prepare(`
         UPDATE items SET
-          name = ?, sku = ?, hsn_code = ?, description = ?, unit = ?, mrp = ?, purchase_rate = ?, sale_rate = ?, customer_rate = ?, salesman_rate = ?, gst_percentage = ?, category_id = ?, current_stock = ?, minimum_stock = ?
+          name = ?, sku = ?, hsn_code = ?, description = ?, unit = ?, mrp = ?, purchase_rate = ?, sale_rate = ?, gst_percentage = ?, category_id = ?, current_stock = ?, minimum_stock = ?
         WHERE id = ?
       `);
 
@@ -145,8 +143,6 @@ export function registerInventoryHandlers({ ipcMain, getDb }) {
         rest.mrp,
         rest.purchase_rate,
         rest.sale_rate,
-        rest.customer_rate,
-        rest.salesman_rate,
         rest.gst_percentage,
         rest.category_id,
         rest.current_stock,

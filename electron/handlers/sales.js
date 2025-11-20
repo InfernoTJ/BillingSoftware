@@ -379,53 +379,5 @@ export function registerSalesHandlers({ ipcMain, getDb }) {
     };
   });
 
-  ipcMain.handle('get-Salesman-Commission', async () => {
-    const db = getDb();
-    const sales = db.prepare(`
-      SELECT s.id as sale_id, s.bill_number, s.customer_name, s.customer_contact, s.sale_date, s.salesman_id, salesman.name as salesman_name
-      FROM sales s
-      LEFT JOIN salesman ON s.salesman_id = salesman.id
-      WHERE s.sale_type = 'customer' AND (s.status_code = 0 OR s.status_code IS NULL)
-      ORDER BY s.sale_date DESC
-    `).all();
-
-    const commissionData = [];
-    for (const sale of sales) {
-      const items = db.prepare(`
-        SELECT si.*, i.name as item_name, i.id as item_id
-        FROM sale_items si
-        LEFT JOIN items i ON si.item_id = i.id
-        WHERE si.sale_id = ? AND si.sale_type = 'customer'
-      `).all(sale.sale_id);
-
-      let totalCommission = 0;
-      const itemCommissions = items.map((item) => {
-        const commission = (item.unit_price - item.salesman_rate) * item.quantity;
-        totalCommission += commission;
-        return {
-          item_id: item.item_id,
-          item_name: item.item_name,
-          quantity: item.quantity,
-          customer_rate: item.customer_rate,
-          salesman_rate: item.salesman_rate,
-          commission
-        };
-      });
-
-      commissionData.push({
-        sale_id: sale.sale_id,
-        bill_number: sale.bill_number,
-        sale_date: sale.sale_date,
-        customer_name: sale.customer_name,
-        customer_contact: sale.customer_contact,
-        salesman_id: sale.salesman_id,
-        salesman_name: sale.salesman_name,
-        items: itemCommissions,
-        totalCommission
-      });
-    }
-
-    return commissionData;
-  });
 }
 

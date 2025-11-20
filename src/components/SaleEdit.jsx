@@ -433,34 +433,6 @@ const SaleEdit = () => {
                 ))}
               </select>
             </div>
-            {/* --- UI for checkboxes --- */}
-            <div className="flex items-center mt-2 space-x-6">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={isSalesmanCustomer}
-                  onChange={e => setIsSalesmanCustomer(e.target.checked)}
-                  id="isSalesmanCustomer"
-                  className="mr-2 w-5 h-5 accent-blue-600"
-                  disabled={isOthers}
-                />
-                <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
-                  Is Salesman
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={isOthers}
-                  onChange={e => setIsOthers(e.target.checked)}
-                  id="isOthers"
-                  className="mr-2 w-5 h-5 accent-blue-600"
-                />
-                <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
-                  Others
-                </label>
-              </div>
-            </div>
           </div>
 
           {/* Item Search */}
@@ -493,10 +465,7 @@ const SaleEdit = () => {
                       tabIndex={-1}
                     >
                       {itm.name} 
-                      <span className="text-xs text-gray-500 ml-2">
-                        (Customer: ₹{itm.customer_rate}, Salesman: ₹{itm.salesman_rate})
-                      </span>
-                    </li>
+                                        </li>
                   ))}
                 </ul>
               )}
@@ -554,10 +523,7 @@ const SaleEdit = () => {
                             Reset
                           </button>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Customer: ₹{item.original_customer_rate || 0} | Salesman: ₹{item.original_salesman_rate || 0}
-                        </div>
-                      </td>
+                        </td>
                       <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
                       <td className="px-4 py-2">
                         <button

@@ -17,7 +17,7 @@ export function registerDashboardHandlers({ ipcMain, getDb }) {
       ).get();
 
       const totalInventoryValue = getDb().prepare(
-        'SELECT COALESCE(SUM(current_stock * customer_rate), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)'
+        'SELECT COALESCE(SUM(current_stock * mrp), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)'
       ).get();
 
       const recentSales = getDb().prepare(`
