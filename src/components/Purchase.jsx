@@ -842,7 +842,7 @@ const getFinalTotal = () => Math.round(totalWithGst);
   }
  
   return (
-     <PinProtected message="This module is protected and requires PIN verification to access." modulename='Purchase'>
+    //  <PinProtected message="This module is protected and requires PIN verification to access." modulename='Purchase'>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -2205,7 +2205,7 @@ const getFinalTotal = () => Math.round(totalWithGst);
        {/* <ToastContainer position="top-right" autoClose={3000} /> */}
     </div>
   
-    </PinProtected>
+    // </PinProtected>
   ); 
 }; 
 

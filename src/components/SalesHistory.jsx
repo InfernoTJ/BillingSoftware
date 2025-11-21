@@ -248,41 +248,7 @@ const SalesHistory = () => {
     }
   };
 
-  const resetPriceToOriginal = async (saleId, itemId, saleType) => {
-    try {
-      const item = items.find(i => i.id === itemId);
-      if (!item) {
-        toast.error('Item not found');
-        return;
-      }
 
-      let originalRate;
-      if (saleType === 'salesman' || saleType === 'others') {
-        originalRate = item.salesman_rate;
-      } else {
-        originalRate = item.customer_rate;
-      }
-
-      if (!originalRate) {
-        toast.error('Original rate not found');
-        return;
-      }
-
-      await window.electronAPI.updateSaleItemPrice(saleId, itemId, originalRate);
-      
-      setEditingPrices(prev => {
-        const newState = { ...prev };
-        delete newState[`${saleId}-${itemId}`];
-        return newState;
-      });
-
-      toast.success('Price reset to original rate');
-      loadSalesHistory();
-    } catch (error) {
-      toast.error('Error resetting price');
-      console.error('Error resetting price:', error);
-    }
-  };
 
   const getTotalSales = () => { 
     return filteredSales.reduce((sum, sale) => sum + sale.total_amount, 0);

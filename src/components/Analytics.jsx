@@ -508,18 +508,18 @@ const Analytics = () => {
 
   if (loading) {
     return (
-      <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
+      // <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
           <span className="ml-2 text-gray-600">Loading comprehensive analytics...</span>
         </div>
-      </PinProtected>
+      // </PinProtected>
     );
   }
 
   if (error || !analyticsData) {
     return (
-      <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
+      // <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <BarChart3 className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -532,14 +532,14 @@ const Analytics = () => {
             </button>
           </div>
         </div>
-      </PinProtected>
+      // </PinProtected>
     );
   }
 
   const { summary, itemAnalytics, topSellingItems, topPurchasedItems, vendors, customers, categories, dailyTrends, inventory: inventoryData } = analyticsData;
 
   return (
-    <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
+    // <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
       <div className="space-y-6">
         {/* Header with Date Range */}
         <div className="flex flex-col sm:flex-row sm:items-center  gap-4">
@@ -1000,7 +1000,7 @@ const Analytics = () => {
           </div>
         </div>
       </div> 
-     </PinProtected>
+    //  </PinProtected>
     );
 };
 

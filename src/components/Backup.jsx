@@ -156,7 +156,7 @@ const Backup = () => {
   
  
   return (
-     <PinProtected message="This module is protected and requires PIN verification to access." modulename="Backup & Restore">
+    //  <PinProtected message="This module is protected and requires PIN verification to access." modulename="Backup & Restore">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -365,7 +365,8 @@ const Backup = () => {
         message="Restoring will replace all current data. Are you sure you want to continue?"
       />
       {/* <ToastContainer position="top-right" autoClose={3000} /> */}
-    </div></PinProtected>
+    </div>
+    // </PinProtected>
   );
 };
 

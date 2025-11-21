@@ -57,7 +57,7 @@ function Banking() {
 
   return (
     <>
-    <PinProtected message="This module is protected and requires PIN verification to access." modulename="Banking">
+    {/* <PinProtected message="This module is protected and requires PIN verification to access." modulename="Banking"> */}
       <div className="p-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="mb-6">
@@ -121,7 +121,7 @@ function Banking() {
           />
         )}
       </div>
-      </PinProtected>
+      {/* </PinProtected> */}
     </>
   );
 }

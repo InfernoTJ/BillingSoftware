@@ -243,7 +243,7 @@ const PurchaseOrder = () => {
   };
 
   return (
-    <PinProtected message="This module is protected and requires PIN verification to access." modulename='Purchase Order'> 
+    // <PinProtected message="This module is protected and requires PIN verification to access." modulename='Purchase Order'> 
       <div className="space-y-6">
         {/* Hidden PurchaseOrderPdf for PDF generation */}
         <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
@@ -438,7 +438,8 @@ const PurchaseOrder = () => {
           </div>
         </div>
       </div>
-    </PinProtected>);
+    // </PinProtected>
+  );
 };
 
 export default PurchaseOrder;

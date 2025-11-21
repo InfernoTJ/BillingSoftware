@@ -37,7 +37,6 @@ const Admin = () => {
             <p className="text-gray-600">Manage products, suppliers, and system settings</p>
           </div>
         </div>
-
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">

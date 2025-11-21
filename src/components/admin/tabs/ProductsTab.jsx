@@ -13,8 +13,6 @@ const initialProductForm = {
   mrp: '',
   purchase_rate: '',
   sale_rate: '',
-  customer_rate: '',
-  salesman_rate: '',
   gst_percentage: '',
   category_id: '',
   current_stock: '',
@@ -35,11 +33,6 @@ const validateProductForm = (form) => {
   const pr = parseFloat(form.purchase_rate);
   if (isNaN(pr) || pr <= 0) errors.purchase_rate = 'Purchase rate must be greater than 0';
 
-  const cr = parseFloat(form.customer_rate);
-  if (isNaN(cr) || cr < 0) errors.customer_rate = 'Customer rate must be 0 or more';
-
-  const smr = parseFloat(form.salesman_rate);
-  if (isNaN(smr) || smr < 0) errors.salesman_rate = 'Salesman rate must be 0 or more';
 
   if (isEmpty(form.gst_percentage) && form.gst_percentage !== 0) {
     errors.gst_percentage = 'GST rate is required';
@@ -57,8 +50,6 @@ const buildProductPayload = (form) => ({
   mrp: Math.max(0, parseFloat(form.mrp) || 0),
   purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
   sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
-  customer_rate: Math.max(0, parseFloat(form.customer_rate) || 0),
-  salesman_rate: Math.max(0, parseFloat(form.salesman_rate) || 0),
   gst_percentage: parseFloat(form.gst_percentage) || 0,
   category_id: parseInt(form.category_id, 10),
   current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
@@ -339,10 +330,10 @@ const ProductsTab = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Customer Rate
+                Purchase Rate
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Salesman Rate
+                MRP
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST%</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
@@ -356,8 +347,8 @@ const ProductsTab = () => {
                   {product.name}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{product.sku}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{product.customer_rate}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{product.salesman_rate}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{product.purchase_rate}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{product.mrp}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{product.gst_percentage}%</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{product.current_stock}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">

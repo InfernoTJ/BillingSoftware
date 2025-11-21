@@ -295,10 +295,7 @@ const Inventory = () => {
                    <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">₹{item.mrp}</span>
                   </td>
-                  {/* <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">₹{item.customer_rate}</span>
-                  </td> */}
-                </tr>
+                 </tr>
               ))}
             </tbody>
           </table>

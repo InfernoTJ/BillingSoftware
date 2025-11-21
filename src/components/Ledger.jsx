@@ -15,7 +15,7 @@ const Ledger = () => {
   ];
 
   return (
-    <PinProtected message="This module is protected and requires PIN verification to access." modulename='Ledger'>
+    // <PinProtected message="This module is protected and requires PIN verification to access." modulename='Ledger'>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -59,7 +59,7 @@ const Ledger = () => {
           </div> 
         </div>
       </div>
-     </PinProtected>
+    //  </PinProtected>
   );
 };
 

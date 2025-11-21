@@ -58,10 +58,6 @@ const SaleEdit = () => {
     items: []
   });
 
-  // --- New states for salesman/customer logic ---
-  const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
-  const [isOthers, setIsOthers] = useState(false);
-
   useEffect(() => {
     loadSaleDetails();
     window.electronAPI.getInventory().then(setItems);
@@ -71,44 +67,36 @@ const SaleEdit = () => {
   }, [id]);
 
   const loadSaleDetails = async () => { 
-  setLoading(true);
-  try {
-    const result = await window.electronAPI.getSaleDetails(parseInt(id));
-    console.log('Fetched sale details:', result);  
-    setSale(result); 
-    setForm({
-      bill_number: result.bill_number,
-      customer_name: result.customer_name || '',
-      customer_contact: result.customer_contact || '',
-      customer_address: result.customer_address || '',
-      customer_gstin: result.customer_gstin || '',
-      sale_date: result.sale_date,
-      discount: result.discount || 0,
-      items: result.items.map(item => ({
-        id: item.item_id,
-        name: item.item_name,
-        hsn_code: item.hsn_code,
-        quantity: item.quantity,
-        unit_price: item.unit_price, // Keep the actual saved price
-        total_price: item.total_price,
-        // Store the original rates for reset functionality
-        original_customer_rate: item.customer_rate,
-        original_salesman_rate: item.salesman_rate,
-        // Store the actual saved price as well
-        saved_unit_price: item.unit_price
-      }))
-    });
-    setSelectedSalesman(result.salesman_id || '');
-
-    // Reflect sale_type in checkboxes
-    setIsSalesmanCustomer(result.sale_type === 'salesman');
-    setIsOthers(result.sale_type === 'others');
-  } catch (error) {
-    toast.error('Error loading sale details');
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const result = await window.electronAPI.getSaleDetails(parseInt(id));
+      console.log('Fetched sale details:', result);  
+      setSale(result); 
+      setForm({
+        bill_number: result.bill_number,
+        customer_name: result.customer_name || '',
+        customer_contact: result.customer_contact || '',
+        customer_address: result.customer_address || '',
+        customer_gstin: result.customer_gstin || '',
+        sale_date: result.sale_date,
+        discount: result.discount || 0,
+        items: result.items.map(item => ({
+          id: item.item_id,
+          name: item.item_name,
+          hsn_code: item.hsn_code,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          saved_unit_price: item.unit_price
+        }))
+      });
+      setSelectedSalesman(result.salesman_id || '');
+    } catch (error) {
+      toast.error('Error loading sale details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Item dropdown logic (for adding new items)
   const [itemSearch, setItemSearch] = useState(''); 
@@ -142,11 +130,7 @@ const SaleEdit = () => {
       setItemSearch('');
       return;
     }
-    // Determine rate based on checkbox logic
-    let rate = item.customer_rate;
-    if (isOthers || isSalesmanCustomer) {
-      rate = item.salesman_rate;
-    }
+    const rate = item.mrp || 0;
     setForm(f => ({
       ...f,
       items: [
@@ -157,9 +141,7 @@ const SaleEdit = () => {
           hsn_code: item.hsn_code,
           quantity: '',
           unit_price: rate,
-          total_price: 0,
-          original_customer_rate: item.customer_rate,
-          original_salesman_rate: item.salesman_rate
+          total_price: 0
         }
       ]
     }));
@@ -194,26 +176,18 @@ const SaleEdit = () => {
     }));
   };
 
-  // Reset price to original rate based on sale type
+  // Reset price to saved price
   const resetPriceToOriginal = (idx) => {
     setForm(f => {
       const items = [...f.items];
       const item = items[idx];
       
-      // Determine which rate to use based on current sale type
-      let originalRate;
-      if (isOthers || isSalesmanCustomer) {
-        originalRate = item.original_salesman_rate;
+      if (item.saved_unit_price) {
+        items[idx].unit_price = item.saved_unit_price;
+        items[idx].total_price = (parseFloat(items[idx].quantity) || 0) * item.saved_unit_price;
+        toast.success('Price reset to original saved price');
       } else {
-        originalRate = item.original_customer_rate;
-      }
-      
-      if (originalRate) {
-        items[idx].unit_price = originalRate;
-        items[idx].total_price = (parseFloat(items[idx].quantity) || 0) * originalRate;
-        toast.success(`Price reset to original ${isOthers || isSalesmanCustomer ? 'salesman' : 'customer'} rate`);
-      } else {
-        toast.error('Original rate not found');
+        toast.error('Original price not found');
       }
       
       return { ...f, items };
@@ -235,47 +209,6 @@ const SaleEdit = () => {
 
   // Final total
   const getFinalAmount = () => Math.round(getAmountBeforeRounding());
-
-  // --- Update item rate logic when checkboxes change ---
-  useEffect(() => {
-    // Only update rates if the sale has been loaded and user is actively changing checkboxes
-    if (!sale) return; 
-    
-    setForm(f => ({
-      ...f,
-      items: f.items.map(item => {
-        // Check if the current unit_price matches any of the original rates
-        const isUsingOriginalCustomerRate = item.unit_price === item.original_customer_rate;
-        const isUsingOriginalSalesmanRate = item.unit_price === item.original_salesman_rate;
-        
-        // Only change the rate if it's currently using one of the original rates
-        // This preserves custom/edited prices
-        if (isUsingOriginalCustomerRate || isUsingOriginalSalesmanRate) {
-          const rate = isOthers || isSalesmanCustomer 
-            ? item.original_salesman_rate 
-            : item.original_customer_rate;
-          
-          return { 
-            ...item, 
-            unit_price: rate || item.unit_price, 
-            total_price: (parseFloat(item.quantity) || 0) * (rate || item.unit_price)
-          };
-        }
-        
-        // Keep the current custom price if it doesn't match original rates
-        return item;
-      })
-    }));
-  }, [isSalesmanCustomer, isOthers, sale]); // Add 'sale' as dependency
-
-  // --- Auto-select salesman to SELF when Others is checked ---
-  useEffect(() => {
-    if (isOthers) {
-      const selfSalesman = salesmen.find(s => s.name?.toLowerCase() === 'self');
-      if (selfSalesman) setSelectedSalesman(selfSalesman.id);
-      setIsSalesmanCustomer(false);
-    }
-  }, [isOthers, salesmen]);
 
   const handleSave = async () => {
     // Validate
@@ -321,7 +254,7 @@ const SaleEdit = () => {
         total_amount: getFinalAmount(),
         rounding_off: getRoundingOff(),
         salesman_id: selectedSalesman || null,
-        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer') 
+        sale_type: sale?.sale_type || 'customer' // Keep original sale_type
       });
       toast.success('Sale updated successfully!');
       navigate('/sales-history');
@@ -339,7 +272,7 @@ const SaleEdit = () => {
   }
 
   return (
-    <PinProtected message="This module is protected and requires PIN verification to access." modulename='Sales Edit'>
+    // <PinProtected message="This module is protected and requires PIN verification to access." modulename='Sales Edit'>
       <div className="p-6">
         <ConfirmModal
           open={confirmOpen}
@@ -425,7 +358,6 @@ const SaleEdit = () => {
                 value={selectedSalesman}
                 onChange={e => setSelectedSalesman(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isOthers}
               >
                 <option value="">Select Salesman</option>
                 {salesmen.map(s => (
@@ -464,8 +396,8 @@ const SaleEdit = () => {
                       onMouseDown={() => addItemToSale(itm)}
                       tabIndex={-1}
                     >
-                      {itm.name} 
-                                        </li>
+                      {itm.name}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -517,13 +449,13 @@ const SaleEdit = () => {
                           <button
                             onClick={() => resetPriceToOriginal(idx)}
                             className="flex items-center text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors"
-                            title={`Reset to original ${isOthers || isSalesmanCustomer ? 'salesman' : 'customer'} rate`}
+                            title="Reset to original saved price"
                           >
                             <RotateCcw className="w-3 h-3 mr-1" />
                             Reset
                           </button>
                         </div>
-                        </td>
+                      </td>
                       <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
                       <td className="px-4 py-2">
                         <button
@@ -582,7 +514,7 @@ const SaleEdit = () => {
           </div>
         </div>
       </div>
-    </PinProtected>
+    // </PinProtected>
   ); 
 };
 
